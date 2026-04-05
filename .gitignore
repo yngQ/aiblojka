@@ -55,5 +55,5 @@ app.*.map.json
 *.chopper.dart
 *.reflectable.dart
 
-# Generated localization (flutter gen-l10n)
-lib/l10n/app_localizations*.dart
+# Claude Code — local-only settings (agent memory IS tracked, this is not)
+.claude/settings.local.json
