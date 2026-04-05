@@ -1,0 +1,51 @@
+# wrangler.toml — AiBlojka Cloudflare Worker
+#
+# This file is provided as a reference for Wrangler CLI deployments.
+# The primary deployment method for this project is via the Cloudflare
+# Dashboard (paste-and-deploy). See README.md for step-by-step instructions.
+#
+# To deploy with CLI:
+#   1. npm install -g wrangler
+#   2. wrangler login
+#   3. wrangler secret put GEMINI_API_KEY   (paste your key when prompted)
+#   4. wrangler deploy
+
+name = "aiblojka-proxy"
+main = "worker.js"
+
+# ES Module format — required for the `export default { fetch }` syntax.
+# Cloudflare Workers runtime — no specific compatibility date lock needed
+# for this Worker, but pinning is good practice.
+compatibility_date = "2024-09-23"
+
+# ---------------------------------------------------------------------------
+# Secrets
+# ---------------------------------------------------------------------------
+# GEMINI_API_KEY is declared here for documentation purposes only.
+# The actual value must be set via:
+#   - Dashboard: Workers → aiblojka-proxy → Settings → Variables and Secrets
+#   - CLI:       wrangler secret put GEMINI_API_KEY
+#
+# Never commit a real key to this file.
+
+# [vars]
+# Uncomment and use vars only for non-sensitive, environment-specific values.
+# ALLOWED_ORIGIN = "https://yngq.github.io"
+
+# ---------------------------------------------------------------------------
+# Routes (optional)
+# ---------------------------------------------------------------------------
+# If you want to serve this Worker on a custom domain instead of the default
+# *.workers.dev subdomain, configure a route here:
+#
+# [[routes]]
+# pattern = "api.yourdomain.com/generate"
+# zone_name = "yourdomain.com"
+
+# ---------------------------------------------------------------------------
+# Limits
+# ---------------------------------------------------------------------------
+# Free tier: 100,000 requests/day, 10ms CPU time per invocation.
+# Image generation requests to Gemini typically take 5–20 seconds wall-clock
+# time but consume very little CPU time in the Worker itself (it is mostly
+# waiting on the upstream fetch).
