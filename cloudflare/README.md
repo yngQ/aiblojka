@@ -108,7 +108,8 @@ Origin: https://yngq.github.io
 {
   "prompt": "Dark cinematic background with a neon-lit cityscape",
   "format": "long",
-  "referenceImageBase64": "<optional: raw base64 string, no data URI prefix>"
+  "referenceImageBase64": "<optional: raw base64 string, no data URI prefix>",
+  "referenceMimeType": "image/jpeg"
 }
 ```
 
@@ -116,7 +117,8 @@ Origin: https://yngq.github.io
 |-------|------|----------|-------|
 | `prompt` | string | yes | Max 2000 characters. English or any language — the Worker wraps it in an English system prompt before sending to Gemini. |
 | `format` | `"long"` or `"short"` | yes | `long` = 1920×1080 (YouTube); `short` = 1080×1920 (TikTok/Shorts/Reels) |
-| `referenceImageBase64` | string | no | Raw base64 without the `data:image/...;base64,` prefix. Max ~10 MB decoded. JPEG, PNG, or WebP. |
+| `referenceImageBase64` | string | no | Raw base64 without the `data:image/...;base64,` prefix. Max ~10 MB decoded. |
+| `referenceMimeType` | `"image/jpeg"` \| `"image/png"` \| `"image/webp"` | if `referenceImageBase64` present | Actual MIME type of the reference file. Required when sending a reference image. |
 
 ### Response — Worker → Flutter (success)
 
@@ -140,12 +142,13 @@ Origin: https://yngq.github.io
 
 | HTTP status | `code` | Meaning |
 |-------------|--------|---------|
-| 400 | `INVALID_REQUEST` | Malformed JSON, missing fields, invalid `format`, prompt too long |
+| 400 | `INVALID_REQUEST` | Malformed JSON, missing fields, invalid `format`, prompt too long, missing `referenceMimeType` |
+| 400 | `BAD_REQUEST` | Gemini rejected the request for a non-safety reason (e.g. malformed inlineData) |
 | 403 | `FORBIDDEN_ORIGIN` | Request came from an origin not in the allowlist |
 | 405 | `METHOD_NOT_ALLOWED` | Non-POST request |
 | 422 | `NO_IMAGE_GENERATED` | Gemini returned a response but without an image part |
-| 429 | `QUOTA_EXCEEDED` | Gemini daily quota exhausted |
-| 451 | `SAFETY_BLOCK` | Request blocked by Gemini content safety filter |
+| 429 | `QUOTA_EXCEEDED` | Gemini per-minute or daily quota exhausted |
+| 451 | `SAFETY_BLOCK` | Request blocked by Gemini content safety filter (via `finishReason=SAFETY` or error message) |
 | 500 | `CONFIGURATION_ERROR` | `GEMINI_API_KEY` secret not set on the Worker |
 | 502 | `UPSTREAM_ERROR` | Gemini returned 5xx or was unreachable after retries |
 

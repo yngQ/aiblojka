@@ -16,9 +16,10 @@ API key passed as query param `?key=GEMINI_API_KEY`.
 
 **Flutter → Worker request body:**
 ```json
-{ "prompt": "...", "format": "long|short", "referenceImageBase64": "..." }
+{ "prompt": "...", "format": "long|short", "referenceImageBase64": "...", "referenceMimeType": "image/jpeg" }
 ```
 - `referenceImageBase64` is optional; raw base64, no data URI prefix; max ~10 MB decoded
+- `referenceMimeType` is required when `referenceImageBase64` is present; one of: `image/jpeg`, `image/png`, `image/webp`
 
 **Worker → Flutter success body:**
 ```json
@@ -33,12 +34,13 @@ API key passed as query param `?key=GEMINI_API_KEY`.
 **Error code map:**
 | HTTP | code | Trigger |
 |------|------|---------|
-| 400 | INVALID_REQUEST | Bad JSON / missing fields / bad format / prompt too long |
+| 400 | INVALID_REQUEST | Bad JSON / missing fields / bad format / prompt too long / missing referenceMimeType |
+| 400 | BAD_REQUEST | Gemini rejected request for non-safety reason (e.g. malformed inlineData) |
 | 403 | FORBIDDEN_ORIGIN | Origin not in allowlist |
 | 405 | METHOD_NOT_ALLOWED | Non-POST |
 | 422 | NO_IMAGE_GENERATED | Gemini responded but no image part found |
-| 429 | QUOTA_EXCEEDED | Gemini daily quota hit |
-| 451 | SAFETY_BLOCK | Gemini content safety block |
+| 429 | QUOTA_EXCEEDED | Gemini per-minute or daily quota hit |
+| 451 | SAFETY_BLOCK | Gemini content safety block (finishReason=SAFETY or error message match) |
 | 500 | CONFIGURATION_ERROR | GEMINI_API_KEY secret missing |
 | 502 | UPSTREAM_ERROR | Gemini 5xx or network failure after retries |
 

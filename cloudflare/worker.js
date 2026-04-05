@@ -159,11 +159,14 @@ function handlePreflight(request) {
 // Request parsing & validation
 // ---------------------------------------------------------------------------
 
+/** Allowed MIME types for reference images. */
+const ALLOWED_REFERENCE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 /**
  * Parses the request body JSON and validates required fields.
  *
  * @param {Request} request
- * @returns {Promise<{ prompt: string, format: string, referenceImageBase64?: string }>}
+ * @returns {Promise<{ prompt: string, format: string, referenceImageBase64?: string, referenceMimeType?: string }>}
  * @throws {Error} on validation failure
  */
 async function parseAndValidateBody(request) {
@@ -204,7 +207,7 @@ async function parseAndValidateBody(request) {
     throw new Error("Request body is not valid JSON.");
   }
 
-  const { prompt, format, referenceImageBase64 } = parsed;
+  const { prompt, format, referenceImageBase64, referenceMimeType } = parsed;
 
   // --- prompt ---
   if (typeof prompt !== "string" || prompt.trim().length === 0) {
@@ -222,20 +225,25 @@ async function parseAndValidateBody(request) {
   }
 
   // --- referenceImageBase64 (optional) ---
-  if (
-    referenceImageBase64 !== undefined &&
-    referenceImageBase64 !== null &&
-    referenceImageBase64 !== ""
-  ) {
-    if (typeof referenceImageBase64 !== "string") {
-      throw new Error(
-        'Field "referenceImageBase64" must be a base64-encoded string.'
-      );
-    }
-    // Rough base64 character validation (no data URI prefix expected).
+  const hasReference =
+    typeof referenceImageBase64 === "string" && referenceImageBase64.length > 0;
+
+  if (hasReference) {
     if (referenceImageBase64.startsWith("data:")) {
       throw new Error(
         'Field "referenceImageBase64" must not include the data URI prefix (e.g. "data:image/...;base64,"). Send only the raw base64 string.'
+      );
+    }
+
+    // --- referenceMimeType (required when referenceImageBase64 is present) ---
+    if (typeof referenceMimeType !== "string" || referenceMimeType.length === 0) {
+      throw new Error(
+        'Field "referenceMimeType" is required when "referenceImageBase64" is provided.'
+      );
+    }
+    if (!ALLOWED_REFERENCE_MIME_TYPES.includes(referenceMimeType)) {
+      throw new Error(
+        `Field "referenceMimeType" must be one of: ${ALLOWED_REFERENCE_MIME_TYPES.join(", ")}.`
       );
     }
   }
@@ -243,10 +251,8 @@ async function parseAndValidateBody(request) {
   return {
     prompt: prompt.trim(),
     format,
-    referenceImageBase64:
-      typeof referenceImageBase64 === "string" && referenceImageBase64.length > 0
-        ? referenceImageBase64
-        : undefined,
+    referenceImageBase64: hasReference ? referenceImageBase64 : undefined,
+    referenceMimeType: hasReference ? referenceMimeType : undefined,
   };
 }
 
@@ -257,11 +263,11 @@ async function parseAndValidateBody(request) {
 /**
  * Builds the Gemini generateContent request body from validated client input.
  *
- * @param {{ prompt: string, format: string, referenceImageBase64?: string }} input
+ * @param {{ prompt: string, format: string, referenceImageBase64?: string, referenceMimeType?: string }} input
  * @returns {object}
  */
 function buildGeminiRequestBody(input) {
-  const { prompt, format, referenceImageBase64 } = input;
+  const { prompt, format, referenceImageBase64, referenceMimeType } = input;
 
   // Assemble the text prompt (all Gemini prompts are in English).
   const formatInstruction =
@@ -280,12 +286,10 @@ function buildGeminiRequestBody(input) {
   const parts = [{ text: fullPrompt }];
 
   // Include reference image if provided.
-  if (referenceImageBase64) {
+  if (referenceImageBase64 && referenceMimeType) {
     parts.push({
       inlineData: {
-        // We treat all references as JPEG; Gemini is lenient about this.
-        // The Flutter client validates the actual file type before encoding.
-        mimeType: "image/jpeg",
+        mimeType: referenceMimeType,
         data: referenceImageBase64,
       },
     });
@@ -308,23 +312,27 @@ function buildGeminiRequestBody(input) {
  * @throws {Error} after all retry attempts are exhausted
  */
 async function callGeminiWithRetry(input, apiKey) {
-  const url = `${GEMINI_ENDPOINT}?key=${apiKey}`;
+  // Use the x-goog-api-key header so the key is not logged in Cloudflare
+  // request logs (query params are included in the URL log; headers are not).
   const geminiBody = buildGeminiRequestBody(input);
 
   let lastError = null;
 
   for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
     if (attempt > 0) {
-      // Exponential backoff: 1s, 2s, 4s …
+      // Exponential backoff: delays are 1s, 2s for attempts 2 and 3.
       const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
       await sleep(delay);
     }
 
     let response;
     try {
-      response = await fetch(url, {
+      response = await fetch(GEMINI_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
         body: JSON.stringify(geminiBody),
       });
     } catch (networkErr) {
@@ -334,7 +342,8 @@ async function callGeminiWithRetry(input, apiKey) {
       continue;
     }
 
-    // Retry on transient server errors.
+    // Retry on 503 (Gemini overloaded) and 429 (per-minute rate limit — not
+    // the daily quota, which won't recover in seconds regardless of retries).
     if (response.status === 429 || response.status === 503) {
       lastError = new Error(`Gemini returned ${response.status}`);
       console.warn(
@@ -401,10 +410,12 @@ async function buildClientResponse(geminiResponse, origin) {
 
     // 400 with a safety block → 451 (Unavailable For Legal Reasons is a
     // reasonable semantic fit for content-policy blocks).
+    // Note: INVALID_ARGUMENT is intentionally excluded — it covers many non-safety
+    // errors (bad inlineData, invalid fields, etc.). We only match on explicit
+    // "safety" language in the error message.
     if (status === 400) {
       const isSafetyBlock =
-        geminiError?.error?.message?.toLowerCase().includes("safety") ||
-        geminiError?.error?.status === "INVALID_ARGUMENT";
+        geminiError?.error?.message?.toLowerCase().includes("safety");
 
       if (isSafetyBlock) {
         return new Response(
@@ -459,18 +470,36 @@ async function buildClientResponse(geminiResponse, origin) {
     );
   }
 
+  // Check for a safety block signalled via finishReason (200 OK response).
+  // Gemini most commonly signals safety blocks this way rather than via a 400.
+  const candidate = geminiData?.candidates?.[0];
+  if (candidate?.finishReason === "SAFETY") {
+    console.error("Gemini safety block (finishReason=SAFETY):", JSON.stringify(candidate.safetyRatings));
+    return new Response(
+      JSON.stringify({
+        error: {
+          code: "SAFETY_BLOCK",
+          message:
+            "The request was blocked by the content safety filter. Please modify your description and try again.",
+        },
+      }),
+      { status: 451, headers }
+    );
+  }
+
   // Locate the image part in the response.
-  const parts = geminiData?.candidates?.[0]?.content?.parts ?? [];
+  const parts = candidate?.content?.parts ?? [];
   const imagePart = parts.find(
     (part) => part.inlineData && part.inlineData.mimeType?.startsWith("image/")
   );
 
   if (!imagePart) {
     // Gemini returned a text-only response or an empty candidate — this can
-    // happen when the model refuses to generate an image without triggering a
-    // formal safety block.
+    // happen when the model soft-refuses without triggering a formal safety block.
     console.error(
-      "Gemini response contained no image part. Parts:",
+      "Gemini response contained no image part. finishReason:",
+      candidate?.finishReason,
+      "Parts:",
       JSON.stringify(parts)
     );
     return new Response(
