@@ -46,3 +46,14 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+
+# Generated files (Dart/Flutter code generation)
+*.g.dart
+*.freezed.dart
+*.config.dart
+*.gr.dart
+*.chopper.dart
+*.reflectable.dart
+
+# Generated localization (flutter gen-l10n)
+lib/l10n/app_localizations*.dart
