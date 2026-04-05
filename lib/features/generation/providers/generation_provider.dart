@@ -1,9 +1,8 @@
-// TODO: Реализовать GenerationNotifier после реализации GenerationService
-// Провайдер будет управлять состоянием генерации обложки:
-// - idle → loading → success(imageBase64) / error(message)
-// Использовать AsyncNotifier с @riverpod кодогенерацией.
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../core/errors/generation_errors.dart';
+import '../../../core/providers/services_providers.dart';
+import '../../../core/services/generation_service.dart';
 
 part 'generation_provider.g.dart';
 
@@ -12,22 +11,35 @@ enum GenerationFormat { long, short }
 @riverpod
 class GenerationNotifier extends _$GenerationNotifier {
   @override
-  AsyncValue<String?> build() => const AsyncValue.data(null);
+  AsyncValue<GenerationResult?> build() => const AsyncValue.data(null);
 
-  // TODO: реализовать после подключения GenerationService
   Future<void> generate({
     required String prompt,
     required GenerationFormat format,
-    String? style,
     String? referenceImageBase64,
+    String? referenceMimeType,
   }) async {
     state = const AsyncValue.loading();
-    // TODO: вызвать GenerationService.generateCover
-    // TODO: обработать typed errors → локализованные сообщения
-    state = AsyncValue.error(
-      UnimplementedError('generation not implemented'),
-      StackTrace.current,
-    );
+
+    final service = ref.read(generationServiceProvider);
+    final formatStr = format == GenerationFormat.long ? 'long' : 'short';
+
+    try {
+      final result = await service.generateCover(
+        prompt: prompt,
+        format: formatStr,
+        referenceImageBase64: referenceImageBase64,
+        referenceMimeType: referenceMimeType,
+      );
+      state = AsyncValue.data(result);
+    } on GenerationException catch (e, st) {
+      state = AsyncValue.error(e, st);
+    } catch (e, st) {
+      state = AsyncValue.error(
+        NetworkException(e.toString()),
+        st,
+      );
+    }
   }
 
   void reset() {
