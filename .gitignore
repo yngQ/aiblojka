@@ -54,3 +54,6 @@ app.*.map.json
 *.gr.dart
 *.chopper.dart
 *.reflectable.dart
+
+# Claude Code — local-only settings (agent memory IS tracked, this is not)
+.claude/settings.local.json

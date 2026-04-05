@@ -35,6 +35,12 @@ fvm flutter pub get                # Install dependencies
 - **context7**: Always use `mcp__context7__resolve-library-id` → `mcp__context7__query-docs` to fetch up-to-date documentation for any library/framework before writing code that depends on it (Flutter, Riverpod, Firebase, Cloudflare Workers, etc.). Prefer this over relying on training data.
 - **dart**: Use `mcp__dart__*` tools instead of shell commands where possible — for running tests (`run_tests`), analyzing (`analyze_files`), formatting (`dart_format`), launching apps (`launch_app`), hot reload/restart, pub operations, and inspecting widget trees.
 
+## Agent Memory
+
+Agent memory files in `.claude/agent-memory/` **must be committed to git** — they carry cross-session context (API contracts, decisions, constraints) that subagents depend on. After any task that produces or updates memory files, stage and commit them together with the related code changes.
+
+`.claude/settings.local.json` is local-only and should remain out of git.
+
 ## Git Workflow
 
 - **NEVER push directly to `main`.** All changes go through feature branches and pull requests.
