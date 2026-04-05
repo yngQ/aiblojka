@@ -1,0 +1,1 @@
+- [Project Bootstrap](project_bootstrap.md) — key decisions made during initial project setup (l10n config, Firebase stub, test rewrite)
