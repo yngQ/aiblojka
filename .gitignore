@@ -54,6 +54,3 @@ app.*.map.json
 *.gr.dart
 *.chopper.dart
 *.reflectable.dart
-
-# Generated localization (flutter gen-l10n)
-lib/l10n/app_localizations*.dart
