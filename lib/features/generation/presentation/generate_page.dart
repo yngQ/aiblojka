@@ -1,6 +1,6 @@
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+
+import 'package:web/web.dart' as web;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -139,9 +139,10 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
       _ => 'png',
     };
     final dataUri = 'data:$mimeType;base64,$imageBase64';
-    html.AnchorElement(href: dataUri)
-      ..setAttribute('download', 'cover.$ext')
-      ..click();
+    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+    anchor.href = dataUri;
+    anchor.download = 'cover.$ext';
+    anchor.click();
   }
 
   // ---------------------------------------------------------------------------
