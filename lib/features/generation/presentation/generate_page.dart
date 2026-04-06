@@ -68,7 +68,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   // Actions
   // ---------------------------------------------------------------------------
 
-  Future<void> _pickReferenceImage(AppLocalizations l10n) async {
+  Future<void> _pickReferenceImage() async {
     setState(() => _referenceError = false);
 
     final result = await FilePicker.platform.pickFiles(
@@ -152,7 +152,6 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   Widget build(BuildContext context) {
     final generationState = ref.watch(generationNotifierProvider);
     final isLoading = generationState.isLoading;
-    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -172,14 +171,13 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _AppHeader(title: l10n.appTitle),
+                        const _AppHeader(),
                         const SizedBox(height: 24),
                         _FormatSelector(
                           selected: _selectedFormat,
                           onChanged: isLoading
                               ? null
                               : (f) => setState(() => _selectedFormat = f),
-                          l10n: l10n,
                         ),
                         const SizedBox(height: _kSectionSpacing),
                         _StyleSelector(
@@ -187,22 +185,19 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                           onChanged: isLoading
                               ? null
                               : (s) => setState(() => _selectedStyle = s),
-                          l10n: l10n,
                         ),
                         const SizedBox(height: _kSectionSpacing),
                         _PromptField(
                           controller: _promptController,
                           enabled: !isLoading,
-                          l10n: l10n,
                         ),
                         const SizedBox(height: _kSectionSpacing),
                         _ReferenceImagePicker(
                           fileName: _referenceFileName,
                           hasError: _referenceError,
                           enabled: !isLoading,
-                          onPick: () => _pickReferenceImage(l10n),
+                          onPick: _pickReferenceImage,
                           onClear: _clearReferenceImage,
-                          l10n: l10n,
                         ),
                         const SizedBox(height: 24),
                         _GenerateButton(
@@ -211,7 +206,6 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                                   _promptController.text.trim().isEmpty
                               ? null
                               : _generate,
-                          l10n: l10n,
                         ),
                         const SizedBox(height: 24),
                         generationState.when(
@@ -224,14 +218,10 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                                 result.mimeType,
                               ),
                               onRegenerate: _reset,
-                              l10n: l10n,
                             );
                           },
                           loading: () => const SizedBox.shrink(),
-                          error: (e, _) => _ErrorCard(
-                            error: e,
-                            l10n: l10n,
-                          ),
+                          error: (e, _) => _ErrorCard(error: e),
                         ),
                         const SizedBox(height: 24),
                       ],
@@ -252,14 +242,12 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
 // ---------------------------------------------------------------------------
 
 class _AppHeader extends StatelessWidget {
-  const _AppHeader({required this.title});
-
-  final String title;
+  const _AppHeader();
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      title,
+      AppLocalizations.of(context)!.appTitle,
       textAlign: TextAlign.center,
       style: const TextStyle(
         color: AppColors.accent,
@@ -279,15 +267,14 @@ class _FormatSelector extends StatelessWidget {
   const _FormatSelector({
     required this.selected,
     required this.onChanged,
-    required this.l10n,
   });
 
   final GenerationFormat selected;
   final ValueChanged<GenerationFormat>? onChanged;
-  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return _SectionCard(
       child: Row(
         children: [
@@ -383,15 +370,14 @@ class _StyleSelector extends StatelessWidget {
   const _StyleSelector({
     required this.selected,
     required this.onChanged,
-    required this.l10n,
   });
 
   final String? selected;
   final ValueChanged<String?>? onChanged;
-  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final styles = <(String?, String)>[
       (null, l10n.noStyleOption),
       ('gaming', l10n.styleGaming),
@@ -481,15 +467,14 @@ class _PromptField extends StatelessWidget {
   const _PromptField({
     required this.controller,
     required this.enabled,
-    required this.l10n,
   });
 
   final TextEditingController controller;
   final bool enabled;
-  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return _SectionCard(
       child: TextFormField(
         controller: controller,
@@ -523,7 +508,6 @@ class _ReferenceImagePicker extends StatelessWidget {
     required this.enabled,
     required this.onPick,
     required this.onClear,
-    required this.l10n,
   });
 
   final String? fileName;
@@ -531,10 +515,10 @@ class _ReferenceImagePicker extends StatelessWidget {
   final bool enabled;
   final VoidCallback onPick;
   final VoidCallback onClear;
-  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -607,15 +591,14 @@ class _GenerateButton extends StatelessWidget {
   const _GenerateButton({
     required this.isLoading,
     required this.onPressed,
-    required this.l10n,
   });
 
   final bool isLoading;
   final VoidCallback? onPressed;
-  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isEnabled = onPressed != null;
 
     return AnimatedContainer(
@@ -690,16 +673,15 @@ class _ResultSection extends StatelessWidget {
     required this.result,
     required this.onDownload,
     required this.onRegenerate,
-    required this.l10n,
   });
 
   final GenerationResult result;
   final VoidCallback onDownload;
   final VoidCallback onRegenerate;
-  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -761,12 +743,11 @@ class _ResultSection extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.error, required this.l10n});
+  const _ErrorCard({required this.error});
 
   final Object error;
-  final AppLocalizations l10n;
 
-  String _errorMessage() {
+  String _errorMessage(AppLocalizations l10n) {
     if (error is QuotaExceededException) return l10n.errorLimitExceeded;
     if (error is SafetyBlockException) return l10n.errorSafetyBlock;
     if (error is NetworkException) return l10n.errorNetwork;
@@ -778,6 +759,7 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(_kCardPadding),
       decoration: BoxDecoration(
@@ -791,7 +773,7 @@ class _ErrorCard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              _errorMessage(),
+              _errorMessage(l10n),
               style: const TextStyle(
                 color: AppColors.error,
                 fontSize: 14,
