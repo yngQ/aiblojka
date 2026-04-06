@@ -83,5 +83,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generatingLabel => 'Генерация...';
 
   @override
+  String get generatingIndicatorLabel => 'Генерация обложки...';
+
+  @override
   String get noStyleOption => 'Без стиля';
 }

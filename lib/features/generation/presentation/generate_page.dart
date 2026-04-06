@@ -619,9 +619,8 @@ class _GenerateButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-                isLoading ? AppColors.disabled : isEnabled ? AppColors.primary : AppColors.disabled,
-            foregroundColor: isLoading ? AppColors.textSecondary : isEnabled ? AppColors.background : AppColors.textSecondary,
+            backgroundColor: isEnabled ? AppColors.primary : AppColors.disabled,
+            foregroundColor: isEnabled ? AppColors.background : AppColors.textSecondary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -684,12 +683,14 @@ class _GeneratingIndicatorState extends State<_GeneratingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AnimatedBuilder(
       animation: _glowOpacity,
       builder: (context, child) {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
+            color: AppColors.background,
             borderRadius: BorderRadius.circular(_kCardRadius),
             boxShadow: [
               BoxShadow(
@@ -702,10 +703,10 @@ class _GeneratingIndicatorState extends State<_GeneratingIndicator>
           child: child,
         );
       },
-      child: const Center(
+      child: Center(
         child: Text(
-          'Генерация обложки...',
-          style: TextStyle(
+          l10n.generatingIndicatorLabel,
+          style: const TextStyle(
             color: AppColors.textSecondary,
             fontSize: 14,
           ),
@@ -741,7 +742,7 @@ class _ResultSection extends StatelessWidget {
           child: Image.memory(
             result.imageBytes,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, _) => const SizedBox.shrink(),
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
           ),
         ),
         const SizedBox(height: 16),

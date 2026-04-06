@@ -6,7 +6,7 @@
     "background_color": "#0E0C08",
     "theme_color": "#FF8F00",
     "description": "AI-генератор обложек для видео",
-    "orientation": "portrait-primary",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
