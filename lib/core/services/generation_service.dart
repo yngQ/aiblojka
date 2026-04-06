@@ -12,7 +12,7 @@ const _kRequestTimeout = Duration(seconds: 60);
 
 /// The result of a successful cover-generation call.
 final class GenerationResult {
-  const GenerationResult({
+  GenerationResult({
     required this.imageBase64,
     required this.mimeType,
   });
@@ -22,6 +22,9 @@ final class GenerationResult {
 
   /// MIME type of the image, e.g. `image/png`.
   final String mimeType;
+
+  /// Decoded image bytes, computed and cached on first access.
+  late final imageBytes = base64Decode(imageBase64);
 }
 
 /// Service responsible for sending generation requests to the Cloudflare Worker

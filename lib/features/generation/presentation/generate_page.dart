@@ -167,8 +167,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                 ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: _kContentMaxWidth),
-                  child: Form(
-                    child: Column(
+                  child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const _AppHeader(),
@@ -226,7 +225,6 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                         const SizedBox(height: 24),
                       ],
                     ),
-                  ),
                 ),
               ),
             );
@@ -279,7 +277,6 @@ class _FormatSelector extends StatelessWidget {
       child: Row(
         children: [
           _FormatOption(
-            format: GenerationFormat.long,
             selected: selected == GenerationFormat.long,
             title: l10n.formatLong,
             subtitle: l10n.formatLongSubtitle,
@@ -289,7 +286,6 @@ class _FormatSelector extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           _FormatOption(
-            format: GenerationFormat.short,
             selected: selected == GenerationFormat.short,
             title: l10n.formatShort,
             subtitle: l10n.formatShortSubtitle,
@@ -305,14 +301,12 @@ class _FormatSelector extends StatelessWidget {
 
 class _FormatOption extends StatelessWidget {
   const _FormatOption({
-    required this.format,
     required this.selected,
     required this.title,
     required this.subtitle,
     required this.onTap,
   });
 
-  final GenerationFormat format;
   final bool selected;
   final String title;
   final String subtitle;
@@ -688,7 +682,7 @@ class _ResultSection extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(_kCardRadius),
           child: Image.memory(
-            base64Decode(result.imageBase64),
+            result.imageBytes,
             fit: BoxFit.contain,
             errorBuilder: (_, __, _) => const SizedBox.shrink(),
           ),
@@ -747,15 +741,13 @@ class _ErrorCard extends StatelessWidget {
 
   final Object error;
 
-  String _errorMessage(AppLocalizations l10n) {
-    if (error is QuotaExceededException) return l10n.errorLimitExceeded;
-    if (error is SafetyBlockException) return l10n.errorSafetyBlock;
-    if (error is NetworkException) return l10n.errorNetwork;
-    if (error is ServerException || error is NoImageGeneratedException) {
-      return l10n.errorServer;
-    }
-    return l10n.errorServer;
-  }
+  String _errorMessage(AppLocalizations l10n) => switch (error) {
+        QuotaExceededException() => l10n.errorLimitExceeded,
+        SafetyBlockException() => l10n.errorSafetyBlock,
+        NetworkException() => l10n.errorNetwork,
+        ServerException() || NoImageGeneratedException() => l10n.errorServer,
+        _ => l10n.errorServer,
+      };
 
   @override
   Widget build(BuildContext context) {
