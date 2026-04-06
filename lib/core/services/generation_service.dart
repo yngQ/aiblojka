@@ -124,8 +124,8 @@ class GenerationService {
       throw const ServerException('Unexpected response format from the server.');
     }
 
-    final imageBase64 = json['imageBase64'] as String?;
-    final mimeType = json['mimeType'] as String?;
+    final imageBase64 = json['imageBase64'] is String ? json['imageBase64'] as String : null;
+    final mimeType = json['mimeType'] is String ? json['mimeType'] as String : null;
 
     if (imageBase64 == null || imageBase64.isEmpty) {
       throw const NoImageGeneratedException();

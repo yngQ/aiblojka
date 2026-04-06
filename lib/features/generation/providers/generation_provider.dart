@@ -35,10 +35,7 @@ class GenerationNotifier extends _$GenerationNotifier {
     } on GenerationException catch (e, st) {
       state = AsyncValue.error(e, st);
     } catch (e, st) {
-      state = AsyncValue.error(
-        NetworkException(e.toString()),
-        st,
-      );
+      state = AsyncValue.error(e, st);
     }
   }
 

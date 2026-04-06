@@ -7,8 +7,9 @@ import '../services/remote_config_service.dart';
 
 part 'services_providers.g.dart';
 
-/// Shared [http.Client] instance. Disposed when the provider is destroyed.
-@riverpod
+/// Shared [http.Client] instance. Kept alive for the app lifetime so it is
+/// never closed while an in-flight generation request holds a reference to it.
+@Riverpod(keepAlive: true)
 http.Client httpClient(Ref ref) {
   final client = http.Client();
   ref.onDispose(client.close);
@@ -16,11 +17,11 @@ http.Client httpClient(Ref ref) {
 }
 
 /// Singleton [RemoteConfigService] used across the app.
-@riverpod
+@Riverpod(keepAlive: true)
 RemoteConfigService remoteConfigService(Ref ref) => RemoteConfigService();
 
 /// [GenerationService] wired up with its dependencies.
-@riverpod
+@Riverpod(keepAlive: true)
 GenerationService generationService(Ref ref) => GenerationService(
       remoteConfig: ref.watch(remoteConfigServiceProvider),
       httpClient: ref.watch(httpClientProvider),
