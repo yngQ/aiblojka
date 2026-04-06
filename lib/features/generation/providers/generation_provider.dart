@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:web/web.dart' as web;
 
 import '../../../core/errors/generation_errors.dart';
 import '../../../core/providers/services_providers.dart';
@@ -20,6 +21,11 @@ class GenerationNotifier extends _$GenerationNotifier {
     String? referenceImageBase64,
     String? referenceMimeType,
   }) async {
+    if (!web.window.navigator.onLine) {
+      state = AsyncValue.error(const NetworkException(), StackTrace.current);
+      return;
+    }
+
     state = const AsyncValue.loading();
 
     final service = ref.read(generationServiceProvider);
@@ -34,8 +40,6 @@ class GenerationNotifier extends _$GenerationNotifier {
         referenceMimeType: referenceMimeType,
       );
       state = AsyncValue.data(result);
-    } on GenerationException catch (e, st) {
-      state = AsyncValue.error(e, st);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
