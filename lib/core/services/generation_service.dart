@@ -47,6 +47,7 @@ class GenerationService {
   Future<GenerationResult> generateCover({
     required String prompt,
     required String format,
+    String? style,
     String? referenceImageBase64,
     String? referenceMimeType,
   }) async {
@@ -69,6 +70,7 @@ class GenerationService {
     final body = <String, dynamic>{
       'prompt': prompt,
       'format': format,
+      if (style != null && style.isNotEmpty) 'style': style,
     };
     if (hasReference) {
       body['referenceImageBase64'] = referenceImageBase64;

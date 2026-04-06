@@ -16,6 +16,7 @@ class GenerationNotifier extends _$GenerationNotifier {
   Future<void> generate({
     required String prompt,
     required GenerationFormat format,
+    String? style,
     String? referenceImageBase64,
     String? referenceMimeType,
   }) async {
@@ -28,6 +29,7 @@ class GenerationNotifier extends _$GenerationNotifier {
       final result = await service.generateCover(
         prompt: prompt,
         format: formatStr,
+        style: style,
         referenceImageBase64: referenceImageBase64,
         referenceMimeType: referenceMimeType,
       );
