@@ -39,7 +39,6 @@ class GeneratePage extends ConsumerStatefulWidget {
 
 class _GeneratePageState extends ConsumerState<GeneratePage> {
   final _promptController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
 
   GenerationFormat _selectedFormat = GenerationFormat.long;
   String? _selectedStyle; // null means "no style"
@@ -51,7 +50,16 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   bool _referenceError = false;
 
   @override
+  void initState() {
+    super.initState();
+    _promptController.addListener(_onPromptChanged);
+  }
+
+  void _onPromptChanged() => setState(() {});
+
+  @override
   void dispose() {
+    _promptController.removeListener(_onPromptChanged);
     _promptController.dispose();
     super.dispose();
   }
@@ -125,9 +133,14 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   }
 
   void _downloadImage(String imageBase64, String mimeType) {
+    final ext = switch (mimeType) {
+      'image/jpeg' => 'jpg',
+      'image/webp' => 'webp',
+      _ => 'png',
+    };
     final dataUri = 'data:$mimeType;base64,$imageBase64';
     html.AnchorElement(href: dataUri)
-      ..setAttribute('download', 'cover.png')
+      ..setAttribute('download', 'cover.$ext')
       ..click();
   }
 
@@ -156,7 +169,6 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: _kContentMaxWidth),
                   child: Form(
-                    key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -200,7 +212,6 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                               ? null
                               : _generate,
                           l10n: l10n,
-                          promptController: _promptController,
                         ),
                         const SizedBox(height: 24),
                         generationState.when(
@@ -597,13 +608,11 @@ class _GenerateButton extends StatelessWidget {
     required this.isLoading,
     required this.onPressed,
     required this.l10n,
-    required this.promptController,
   });
 
   final bool isLoading;
   final VoidCallback? onPressed;
   final AppLocalizations l10n;
-  final TextEditingController promptController;
 
   @override
   Widget build(BuildContext context) {
@@ -691,16 +700,13 @@ class _ResultSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dataUri =
-        'data:${result.mimeType};base64,${result.imageBase64}';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(_kCardRadius),
-          child: Image.network(
-            dataUri,
+          child: Image.memory(
+            base64Decode(result.imageBase64),
             fit: BoxFit.contain,
             errorBuilder: (_, __, _) => const SizedBox.shrink(),
           ),
