@@ -55,15 +55,24 @@ class GenerationService {
       defaultValue: _kDefaultWorkerUrl,
     );
 
+    final bool hasReference =
+        referenceImageBase64 != null && referenceImageBase64.isNotEmpty;
+
+    if (hasReference && (referenceMimeType == null || referenceMimeType.isEmpty)) {
+      throw ArgumentError.value(
+        referenceMimeType,
+        'referenceMimeType',
+        'referenceMimeType is required when referenceImageBase64 is provided.',
+      );
+    }
+
     final body = <String, dynamic>{
       'prompt': prompt,
       'format': format,
     };
-    if (referenceImageBase64 != null && referenceImageBase64.isNotEmpty) {
+    if (hasReference) {
       body['referenceImageBase64'] = referenceImageBase64;
-      if (referenceMimeType != null && referenceMimeType.isNotEmpty) {
-        body['referenceMimeType'] = referenceMimeType;
-      }
+      body['referenceMimeType'] = referenceMimeType;
     }
 
     final http.Response response;
@@ -77,7 +86,7 @@ class GenerationService {
           .timeout(_kRequestTimeout);
     } on TimeoutException {
       throw const NetworkException('Request timed out. Please try again.');
-    } catch (_) {
+    } on http.ClientException {
       throw const NetworkException();
     }
 
