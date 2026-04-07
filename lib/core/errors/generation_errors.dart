@@ -11,7 +11,7 @@ sealed class GenerationException implements Exception {
   String toString() => '$runtimeType: $message';
 }
 
-/// HTTP 429 — Gemini quota exhausted.
+/// HTTP 429 — Workers AI quota exhausted.
 final class QuotaExceededException extends GenerationException {
   const QuotaExceededException([
     super.message = 'Daily generation limit reached. Please try again tomorrow.',
@@ -26,14 +26,14 @@ final class SafetyBlockException extends GenerationException {
   ]);
 }
 
-/// HTTP 5xx / 502 — Upstream (Gemini or Worker) returned a server error.
+/// HTTP 5xx / 502 — Workers AI returned a server error.
 final class ServerException extends GenerationException {
   const ServerException([
     super.message = 'The AI service returned an error. Please try again later.',
   ]);
 }
 
-/// HTTP 422 — Gemini did not produce an image part.
+/// HTTP 422 — Workers AI did not generate an image.
 final class NoImageGeneratedException extends GenerationException {
   const NoImageGeneratedException([
     super.message =

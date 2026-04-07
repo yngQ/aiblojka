@@ -1,16 +1,15 @@
 /**
  * AiBlojka — Cloudflare Worker
  *
- * Proxy between the Flutter Web PWA (GitHub Pages) and the Gemini 2.5 Flash
- * Image API. Holds the GEMINI_API_KEY secret so it is never exposed to the
- * client.
+ * Proxy between Flutter Web (GitHub Pages) and Cloudflare Workers AI.
+ * Generates image covers with an edge model and returns base64 payload
+ * expected by the Flutter app.
  *
- * Environment variables (set in Cloudflare Dashboard → Workers → Settings →
- * Variables and Secrets):
- *   GEMINI_API_KEY  — encrypted secret, Gemini API key
+ * Required Worker binding:
+ *   AI  — Workers AI binding (env.AI.run)
  *
  * Allowed origins:
- *   https://yngQ.github.io   — production (GitHub Pages)
+ *   https://yngq.github.io   — production (GitHub Pages)
  *   http://localhost:*        — any local dev port
  */
 
@@ -18,11 +17,11 @@
 // Constants
 // ---------------------------------------------------------------------------
 
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent";
+/** Cloudflare Workers AI model id (fast and suitable for free-tier usage). */
+const WORKERS_AI_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
 /** Production GitHub Pages origin for this project. */
-const PRODUCTION_ORIGIN = "https://yngQ.github.io";
+const PRODUCTION_ORIGIN = "https://yngq.github.io";
 
 /** Maximum allowed request body size: 12 MB (10 MB image + JSON overhead). */
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
@@ -30,9 +29,8 @@ const MAX_BODY_BYTES = 12 * 1024 * 1024;
 /** Maximum prompt length in characters. */
 const MAX_PROMPT_LENGTH = 2000;
 
-// Retry config for transient Gemini errors (429, 503).
-const RETRY_ATTEMPTS = 3;
-const RETRY_BASE_DELAY_MS = 1000;
+/** Output MIME type returned by FLUX.1 schnell payload image string. */
+const OUTPUT_MIME_TYPE = "image/jpeg";
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -43,11 +41,10 @@ export default {
    * Main fetch handler.
    *
    * @param {Request} request
-   * @param {{ GEMINI_API_KEY: string }} env
-   * @param {ExecutionContext} ctx
+   * @param {{ AI?: { run: (model: string, input: unknown) => Promise<unknown> } }} env
    * @returns {Promise<Response>}
    */
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     // Handle CORS preflight.
     if (request.method === "OPTIONS") {
       return handlePreflight(request);
@@ -68,13 +65,14 @@ export default {
       );
     }
 
-    // Guard: API key must be configured.
-    if (!env.GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY secret is not configured.");
-      return errorResponse(
+    // Guard: Workers AI binding must be configured.
+    if (!env.AI || typeof env.AI.run !== "function") {
+      console.error("Workers AI binding is not configured.");
+      return errorResponseWithCors(
         500,
         "CONFIGURATION_ERROR",
-        "Server configuration error."
+        "Server configuration error.",
+        origin
       );
     }
 
@@ -83,20 +81,26 @@ export default {
     try {
       body = await parseAndValidateBody(request);
     } catch (err) {
-      return errorResponse(400, "INVALID_REQUEST", err.message);
+      return errorResponseWithCors(400, "INVALID_REQUEST", err.message, origin);
     }
 
-    // Forward to Gemini with retry logic.
-    let geminiResponse;
+    const aiInput = buildWorkersAiInput(body);
+
+    // Optional reference images are currently ignored by the selected model.
+    if (body.referenceImageBase64) {
+      console.warn(
+        "referenceImageBase64 was provided, but the selected Workers AI model does not support image conditioning; reference image is ignored."
+      );
+    }
+
+    let aiResult;
     try {
-      geminiResponse = await callGeminiWithRetry(body, env.GEMINI_API_KEY);
+      aiResult = await env.AI.run(WORKERS_AI_MODEL, aiInput);
     } catch (err) {
-      console.error("Gemini call failed after retries:", err.message);
-      return errorResponse(502, "UPSTREAM_ERROR", "Failed to reach Gemini API.");
+      return mapWorkersAiError(err, origin);
     }
 
-    // Map Gemini response to the client contract.
-    return buildClientResponse(geminiResponse, origin);
+    return buildClientSuccessResponse(aiResult, origin);
   },
 };
 
@@ -112,9 +116,7 @@ export default {
  */
 function isAllowedOrigin(origin) {
   if (origin === PRODUCTION_ORIGIN) return true;
-  // Allow any localhost port for local Flutter development.
   if (origin.startsWith("http://localhost:")) return true;
-  // Also allow bare localhost without a port (rare but valid).
   if (origin === "http://localhost") return true;
   return false;
 }
@@ -166,8 +168,7 @@ const ALLOWED_REFERENCE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
  * Parses the request body JSON and validates required fields.
  *
  * @param {Request} request
- * @returns {Promise<{ prompt: string, format: string, referenceImageBase64?: string, referenceMimeType?: string }>}
- * @throws {Error} on validation failure
+ * @returns {Promise<{ prompt: string, format: "long" | "short", referenceImageBase64?: string, referenceMimeType?: string }>}
  */
 async function parseAndValidateBody(request) {
   const contentType = request.headers.get("Content-Type") ?? "";
@@ -175,11 +176,7 @@ async function parseAndValidateBody(request) {
     throw new Error("Content-Type must be application/json.");
   }
 
-  // Enforce body size limit before reading.
-  const contentLength = parseInt(
-    request.headers.get("Content-Length") ?? "0",
-    10
-  );
+  const contentLength = parseInt(request.headers.get("Content-Length") ?? "0", 10);
   if (contentLength > MAX_BODY_BYTES) {
     throw new Error(
       `Request body too large. Maximum allowed size is ${MAX_BODY_BYTES / (1024 * 1024)} MB.`
@@ -188,7 +185,6 @@ async function parseAndValidateBody(request) {
 
   let rawBody;
   try {
-    // Clone so we can read; also check actual byte length.
     const arrayBuffer = await request.arrayBuffer();
     if (arrayBuffer.byteLength > MAX_BODY_BYTES) {
       throw new Error(
@@ -209,7 +205,6 @@ async function parseAndValidateBody(request) {
 
   const { prompt, format, referenceImageBase64, referenceMimeType } = parsed;
 
-  // --- prompt ---
   if (typeof prompt !== "string" || prompt.trim().length === 0) {
     throw new Error('Field "prompt" is required and must be a non-empty string.');
   }
@@ -219,23 +214,20 @@ async function parseAndValidateBody(request) {
     );
   }
 
-  // --- format ---
   if (format !== "long" && format !== "short") {
     throw new Error('Field "format" must be "long" or "short".');
   }
 
-  // --- referenceImageBase64 (optional) ---
   const hasReference =
     typeof referenceImageBase64 === "string" && referenceImageBase64.length > 0;
 
   if (hasReference) {
     if (referenceImageBase64.startsWith("data:")) {
       throw new Error(
-        'Field "referenceImageBase64" must not include the data URI prefix (e.g. "data:image/...;base64,"). Send only the raw base64 string.'
+        'Field "referenceImageBase64" must not include data URI prefix. Send only the raw base64 string.'
       );
     }
 
-    // --- referenceMimeType (required when referenceImageBase64 is present) ---
     if (typeof referenceMimeType !== "string" || referenceMimeType.length === 0) {
       throw new Error(
         'Field "referenceMimeType" is required when "referenceImageBase64" is provided.'
@@ -257,270 +249,137 @@ async function parseAndValidateBody(request) {
 }
 
 // ---------------------------------------------------------------------------
-// Gemini API call
+// Workers AI
 // ---------------------------------------------------------------------------
 
 /**
- * Builds the Gemini generateContent request body from validated client input.
+ * Builds Workers AI model input.
  *
- * @param {{ prompt: string, format: string, referenceImageBase64?: string, referenceMimeType?: string }} input
- * @returns {object}
+ * @param {{ prompt: string, format: "long" | "short" }} input
+ * @returns {{ prompt: string, steps: number }}
  */
-function buildGeminiRequestBody(input) {
-  const { prompt, format, referenceImageBase64, referenceMimeType } = input;
-
-  // Assemble the text prompt (all Gemini prompts are in English).
+function buildWorkersAiInput(input) {
   const formatInstruction =
-    format === "long"
-      ? "Create a horizontal YouTube video thumbnail at 1920x1080 resolution (16:9 aspect ratio)."
-      : "Create a vertical video cover at 1080x1920 resolution (9:16 aspect ratio), suitable for TikTok, YouTube Shorts, and Instagram Reels.";
+    input.format === "long"
+      ? "Create a horizontal YouTube thumbnail in 16:9 landscape composition."
+      : "Create a vertical short-video cover in 9:16 portrait composition.";
 
   const fullPrompt =
-    `You are an expert video thumbnail and cover designer. Generate a high-quality, visually striking image for a video cover. ` +
+    `You are an expert video thumbnail designer. ` +
     `${formatInstruction} ` +
-    `Design requirements: ${prompt}. ` +
-    `Technical requirements: high resolution, no compression artifacts, clean composition, professional quality. ` +
-    `Do not add any watermarks, logos, or unintended text overlays unless explicitly requested.`;
-
-  /** @type {Array<object>} */
-  const parts = [{ text: fullPrompt }];
-
-  // Include reference image if provided.
-  if (referenceImageBase64 && referenceMimeType) {
-    parts.push({
-      inlineData: {
-        mimeType: referenceMimeType,
-        data: referenceImageBase64,
-      },
-    });
-  }
+    `User concept: ${input.prompt}. ` +
+    `Style requirements: high contrast, clear focal subject, clean composition, professional quality. ` +
+    `Do not add watermarks, logos, or accidental text unless explicitly requested.`;
 
   return {
-    contents: [{ parts }],
-    generationConfig: {
-      responseModalities: ["IMAGE", "TEXT"],
-    },
+    prompt: fullPrompt,
+    // FLUX.1 schnell: default 4, max 8.
+    steps: 4,
   };
 }
 
 /**
- * Calls the Gemini API with exponential backoff on 429 and 503 responses.
+ * Maps Workers AI runtime error to API contract.
  *
- * @param {{ prompt: string, format: string, referenceImageBase64?: string }} input
- * @param {string} apiKey
- * @returns {Promise<Response>}
- * @throws {Error} after all retry attempts are exhausted
+ * @param {unknown} err
+ * @param {string} origin
+ * @returns {Response}
  */
-async function callGeminiWithRetry(input, apiKey) {
-  // Use the x-goog-api-key header so the key is not logged in Cloudflare
-  // request logs (query params are included in the URL log; headers are not).
-  const geminiBody = buildGeminiRequestBody(input);
+function mapWorkersAiError(err, origin) {
+  const message = normalizeErrorMessage(err).toLowerCase();
+  const rawMessage = normalizeErrorMessage(err);
 
-  let lastError = null;
-
-  for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
-    if (attempt > 0) {
-      // Exponential backoff: delays are 1s, 2s for attempts 2 and 3.
-      const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
-      await sleep(delay);
-    }
-
-    let response;
-    try {
-      response = await fetch(GEMINI_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify(geminiBody),
-      });
-    } catch (networkErr) {
-      // Network-level failure — retry.
-      lastError = networkErr;
-      console.warn(`Gemini network error on attempt ${attempt + 1}:`, networkErr.message);
-      continue;
-    }
-
-    // Retry on 503 (Gemini overloaded) and 429 (per-minute rate limit — not
-    // the daily quota, which won't recover in seconds regardless of retries).
-    if (response.status === 429 || response.status === 503) {
-      lastError = new Error(`Gemini returned ${response.status}`);
-      console.warn(
-        `Gemini transient error ${response.status} on attempt ${attempt + 1}; will retry.`
-      );
-      continue;
-    }
-
-    // Any other status (200, 400, 500, etc.) — return immediately.
-    return response;
-  }
-
-  throw lastError ?? new Error("Gemini call failed after all retry attempts.");
-}
-
-// ---------------------------------------------------------------------------
-// Response mapping
-// ---------------------------------------------------------------------------
-
-/**
- * Parses the Gemini response and maps it to the client contract.
- *
- * Success response to Flutter:
- *   { "imageBase64": "...", "mimeType": "image/png" }
- *
- * Error response to Flutter:
- *   { "error": { "code": "...", "message": "..." } }
- *
- * @param {Response} geminiResponse
- * @param {string} origin  — used to attach CORS headers
- * @returns {Promise<Response>}
- */
-async function buildClientResponse(geminiResponse, origin) {
-  const headers = {
-    "Content-Type": "application/json",
-    ...corsHeaders(origin),
-  };
-
-  // --- Handle Gemini-level errors ---
-  if (!geminiResponse.ok) {
-    let geminiError;
-    try {
-      geminiError = await geminiResponse.json();
-    } catch {
-      geminiError = null;
-    }
-
-    const status = geminiResponse.status;
-    console.error(`Gemini error ${status}:`, JSON.stringify(geminiError));
-
-    // 429 — quota exhausted; pass through as-is.
-    if (status === 429) {
-      return new Response(
-        JSON.stringify({
-          error: {
-            code: "QUOTA_EXCEEDED",
-            message:
-              "Daily generation limit reached. Please try again tomorrow.",
-          },
-        }),
-        { status: 429, headers }
-      );
-    }
-
-    // 400 with a safety block → 451 (Unavailable For Legal Reasons is a
-    // reasonable semantic fit for content-policy blocks).
-    // Note: INVALID_ARGUMENT is intentionally excluded — it covers many non-safety
-    // errors (bad inlineData, invalid fields, etc.). We only match on explicit
-    // "safety" language in the error message.
-    if (status === 400) {
-      const isSafetyBlock =
-        geminiError?.error?.message?.toLowerCase().includes("safety");
-
-      if (isSafetyBlock) {
-        return new Response(
-          JSON.stringify({
-            error: {
-              code: "SAFETY_BLOCK",
-              message:
-                "The request was blocked by the content safety filter. Please modify your description and try again.",
-            },
-          }),
-          { status: 451, headers }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          error: {
-            code: "BAD_REQUEST",
-            message: "The request was rejected by the AI model.",
-          },
-        }),
-        { status: 400, headers }
-      );
-    }
-
-    // 5xx and anything else.
-    return new Response(
-      JSON.stringify({
-        error: {
-          code: "UPSTREAM_ERROR",
-          message: "The AI service returned an error. Please try again later.",
-        },
-      }),
-      { status: 502, headers }
+  if (
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
+    message.includes("resource exhausted")
+  ) {
+    return errorResponseWithCors(
+      429,
+      "QUOTA_EXCEEDED",
+      "Generation quota reached. Please try again later.",
+      origin
     );
   }
 
-  // --- Parse successful Gemini response ---
-  let geminiData;
-  try {
-    geminiData = await geminiResponse.json();
-  } catch {
-    console.error("Failed to parse Gemini success response as JSON.");
-    return new Response(
-      JSON.stringify({
-        error: {
-          code: "PARSE_ERROR",
-          message: "Unexpected response from AI service.",
-        },
-      }),
-      { status: 502, headers }
+  if (message.includes("safety") || message.includes("policy")) {
+    return errorResponseWithCors(
+      451,
+      "SAFETY_BLOCK",
+      "The request was blocked by the content safety filter.",
+      origin
     );
   }
 
-  // Check for a safety block signalled via finishReason (200 OK response).
-  // Gemini most commonly signals safety blocks this way rather than via a 400.
-  const candidate = geminiData?.candidates?.[0];
-  if (candidate?.finishReason === "SAFETY") {
-    console.error("Gemini safety block (finishReason=SAFETY):", JSON.stringify(candidate.safetyRatings));
-    return new Response(
-      JSON.stringify({
-        error: {
-          code: "SAFETY_BLOCK",
-          message:
-            "The request was blocked by the content safety filter. Please modify your description and try again.",
-        },
-      }),
-      { status: 451, headers }
-    );
+  if (message.includes("invalid") || message.includes("bad request")) {
+    return errorResponseWithCors(400, "BAD_REQUEST", rawMessage, origin);
   }
 
-  // Locate the image part in the response.
-  const parts = candidate?.content?.parts ?? [];
-  const imagePart = parts.find(
-    (part) => part.inlineData && part.inlineData.mimeType?.startsWith("image/")
+  console.error("Workers AI invocation failed:", rawMessage);
+  return errorResponseWithCors(
+    502,
+    "UPSTREAM_ERROR",
+    "The AI service returned an error. Please try again later.",
+    origin
   );
+}
 
-  if (!imagePart) {
-    // Gemini returned a text-only response or an empty candidate — this can
-    // happen when the model soft-refuses without triggering a formal safety block.
-    console.error(
-      "Gemini response contained no image part. finishReason:",
-      candidate?.finishReason,
-      "Parts:",
-      JSON.stringify(parts)
-    );
-    return new Response(
-      JSON.stringify({
-        error: {
-          code: "NO_IMAGE_GENERATED",
-          message:
-            "The AI model did not generate an image. Please modify your description and try again.",
-        },
-      }),
-      { status: 422, headers }
+/**
+ * Builds success response from Workers AI output.
+ *
+ * @param {unknown} aiResult
+ * @param {string} origin
+ * @returns {Response}
+ */
+function buildClientSuccessResponse(aiResult, origin) {
+  const imageBase64 = extractImageBase64(aiResult);
+  if (!imageBase64) {
+    console.error("Workers AI response contained no image:", JSON.stringify(aiResult));
+    return errorResponseWithCors(
+      422,
+      "NO_IMAGE_GENERATED",
+      "The AI model did not generate an image.",
+      origin
     );
   }
 
   return new Response(
     JSON.stringify({
-      imageBase64: imagePart.inlineData.data,
-      mimeType: imagePart.inlineData.mimeType,
+      imageBase64,
+      mimeType: OUTPUT_MIME_TYPE,
     }),
-    { status: 200, headers }
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders(origin),
+      },
+    }
   );
+}
+
+/**
+ * Tries known result shapes for Workers AI image models.
+ *
+ * @param {unknown} aiResult
+ * @returns {string | null}
+ */
+function extractImageBase64(aiResult) {
+  if (typeof aiResult === "object" && aiResult !== null) {
+    if (typeof aiResult.image === "string" && aiResult.image.length > 0) {
+      return aiResult.image;
+    }
+    if (
+      typeof aiResult.result === "object" &&
+      aiResult.result !== null &&
+      typeof aiResult.result.image === "string" &&
+      aiResult.result.image.length > 0
+    ) {
+      return aiResult.result.image;
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -528,7 +387,7 @@ async function buildClientResponse(geminiResponse, origin) {
 // ---------------------------------------------------------------------------
 
 /**
- * Creates a structured JSON error response.
+ * Creates a structured JSON error response without CORS headers.
  *
  * @param {number} status
  * @param {string} code
@@ -536,25 +395,47 @@ async function buildClientResponse(geminiResponse, origin) {
  * @returns {Response}
  */
 function errorResponse(status, code, message) {
-  return new Response(
-    JSON.stringify({ error: { code, message } }),
-    {
-      status,
-      headers: { "Content-Type": "application/json" },
-    }
-  );
+  return new Response(JSON.stringify({ error: { code, message } }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
-// ---------------------------------------------------------------------------
-// Utilities
-// ---------------------------------------------------------------------------
+/**
+ * Creates a structured JSON error response with CORS headers.
+ *
+ * @param {number} status
+ * @param {string} code
+ * @param {string} message
+ * @param {string} origin
+ * @returns {Response}
+ */
+function errorResponseWithCors(status, code, message, origin) {
+  return new Response(JSON.stringify({ error: { code, message } }), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders(origin),
+    },
+  });
+}
 
 /**
- * Returns a promise that resolves after `ms` milliseconds.
+ * Best-effort conversion of unknown errors to readable string.
  *
- * @param {number} ms
- * @returns {Promise<void>}
+ * @param {unknown} err
+ * @returns {string}
  */
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function normalizeErrorMessage(err) {
+  if (err instanceof Error && typeof err.message === "string") {
+    return err.message;
+  }
+  if (typeof err === "string") {
+    return err;
+  }
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return "Unknown error";
+  }
 }

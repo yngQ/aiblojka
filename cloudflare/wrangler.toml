@@ -7,8 +7,7 @@
 # To deploy with CLI:
 #   1. npm install -g wrangler
 #   2. wrangler login
-#   3. wrangler secret put GEMINI_API_KEY   (paste your key when prompted)
-#   4. wrangler deploy
+#   3. wrangler deploy
 
 name = "aiblojka-proxy"
 main = "worker.js"
@@ -19,18 +18,14 @@ main = "worker.js"
 compatibility_date = "2024-09-23"
 
 # ---------------------------------------------------------------------------
-# Secrets
+# Workers AI binding
 # ---------------------------------------------------------------------------
-# GEMINI_API_KEY is declared here for documentation purposes only.
-# The actual value must be set via:
-#   - Dashboard: Workers → aiblojka-proxy → Settings → Variables and Secrets
-#   - CLI:       wrangler secret put GEMINI_API_KEY
-#
-# Never commit a real key to this file.
+[ai]
+binding = "AI"
 
 # [vars]
 # Uncomment and use vars only for non-sensitive, environment-specific values.
-# ALLOWED_ORIGIN = "https://yngQ.github.io"
+# ALLOWED_ORIGIN = "https://yngq.github.io"
 
 # ---------------------------------------------------------------------------
 # Routes (optional)
@@ -46,6 +41,5 @@ compatibility_date = "2024-09-23"
 # Limits
 # ---------------------------------------------------------------------------
 # Free tier: 100,000 requests/day, 10ms CPU time per invocation.
-# Image generation requests to Gemini typically take 5–20 seconds wall-clock
-# time but consume very little CPU time in the Worker itself (it is mostly
-# waiting on the upstream fetch).
+# Image generation requests to Workers AI can take several seconds wall-clock
+# time but consume very little CPU time in the Worker itself.
