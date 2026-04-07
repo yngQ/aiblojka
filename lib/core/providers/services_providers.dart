@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../services/analytics_service.dart';
 import '../services/generation_service.dart';
+import '../services/history_service.dart';
 import '../services/prompt_builder.dart';
 import '../services/remote_config_service.dart';
 
@@ -39,3 +40,7 @@ GenerationService generationService(Ref ref) => GenerationService(
       remoteConfig: ref.watch(remoteConfigServiceProvider),
       httpClient: ref.watch(httpClientProvider),
     );
+
+/// [HistoryService] singleton.
+@Riverpod(keepAlive: true)
+HistoryService historyService(Ref ref) => HistoryService();

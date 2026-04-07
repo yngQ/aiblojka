@@ -95,4 +95,10 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get errorWorkerNotConfigured =>
       'Сервис генерации не настроен, обратитесь к администратору';
+
+  @override
+  String get historySectionTitle => 'История';
+
+  @override
+  String get historyClearButton => 'Очистить';
 }

@@ -27,5 +27,7 @@
   "generatingIndicatorLabel": "Генерация обложки...",
   "noStyleOption": "Без стиля",
   "errorGenerationDisabled": "Генерация временно недоступна, попробуйте позже",
-  "errorWorkerNotConfigured": "Сервис генерации не настроен, обратитесь к администратору"
+  "errorWorkerNotConfigured": "Сервис генерации не настроен, обратитесь к администратору",
+  "historySectionTitle": "История",
+  "historyClearButton": "Очистить"
 }

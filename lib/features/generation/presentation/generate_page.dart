@@ -232,6 +232,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                           loading: () => const SizedBox.shrink(),
                           error: (e, _) => _ErrorCard(error: e),
                         ),
+                        _HistorySection(onDownload: _downloadImage),
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -839,6 +840,110 @@ class _ErrorCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _HistorySection
+// ---------------------------------------------------------------------------
+
+const double _kHistoryRowHeight = 100.0;
+const double _kHistoryThumbRadius = 8.0;
+// Aspect ratios for cover formats
+const double _kAspectLong = 16 / 9; // → thumb width ≈ 177 at 100 h (capped)
+const double _kAspectShort = 9 / 16; // → thumb width ≈ 56 at 100 h
+
+class _HistorySection extends ConsumerWidget {
+  const _HistorySection({required this.onDownload});
+
+  final void Function(String imageBase64, String mimeType) onDownload;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entries = ref.watch(historyNotifierProvider);
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    final l10n = AppLocalizations.of(context)!;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: _kSectionSpacing),
+        Row(
+          children: [
+            Text(
+              l10n.historySectionTitle,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () =>
+                  ref.read(historyNotifierProvider.notifier).clear(),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.textSecondary,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    l10n.historyClearButton,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: _kHistoryRowHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: entries.length,
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              final isLong = entry.format == 'long';
+              final thumbWidth = isLong
+                  ? _kHistoryRowHeight * _kAspectLong
+                  : _kHistoryRowHeight * _kAspectShort;
+              return Padding(
+                padding: EdgeInsets.only(right: index < entries.length - 1 ? 8 : 0),
+                child: GestureDetector(
+                  onTap: () => onDownload(entry.imageBase64, entry.mimeType),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
+                    child: SizedBox(
+                      width: thumbWidth,
+                      height: _kHistoryRowHeight,
+                      child: Image.memory(
+                        entry.imageBytes,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          color: AppColors.surface,
+                          child: const Icon(
+                            Icons.broken_image_outlined,
+                            color: AppColors.disabled,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
