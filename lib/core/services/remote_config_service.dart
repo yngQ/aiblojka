@@ -1,7 +1,8 @@
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:flutter/foundation.dart';
 
 const _kDefaults = <String, dynamic>{
-  'cloudflare_worker_url': 'http://localhost:8787',
+  'cloudflare_worker_url': '',
   'generation_enabled': true,
   'prompt_template_long':
       'Create a professional YouTube video thumbnail at 1920x1080 pixels (16:9 landscape). '
@@ -39,8 +40,9 @@ class RemoteConfigService {
     await _rc.setDefaults(_kDefaults);
     try {
       await _rc.fetchAndActivate();
-    } catch (_) {
-      // Use cached or default values if the network fetch fails.
+    } catch (e) {
+      // Use cached or default values if fetch fails (network error, config issue, etc.)
+      debugPrint('RemoteConfigService: fetchAndActivate failed: $e');
     }
   }
 

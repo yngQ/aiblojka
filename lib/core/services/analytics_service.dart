@@ -13,6 +13,7 @@ class AnalyticsService {
       name: 'generation_started',
       parameters: {
         'format': format,
+        // ignore: use_null_aware_elements
         if (style != null) 'style': style,
       },
     );
@@ -27,6 +28,7 @@ class AnalyticsService {
       name: 'generation_success',
       parameters: {
         'format': format,
+        // ignore: use_null_aware_elements
         if (style != null) 'style': style,
         'duration_ms': durationMs,
       },

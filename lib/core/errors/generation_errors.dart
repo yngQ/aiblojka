@@ -54,3 +54,10 @@ final class GenerationDisabledException extends GenerationException {
     super.message = 'Generation is currently disabled. Please try again later.',
   ]);
 }
+
+/// Cloudflare Worker URL is not configured in Remote Config.
+final class WorkerNotConfiguredException extends GenerationException {
+  const WorkerNotConfiguredException([
+    super.message = 'Worker URL is not configured. Set cloudflare_worker_url in Remote Config.',
+  ]);
+}

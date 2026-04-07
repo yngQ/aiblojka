@@ -91,4 +91,8 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get errorGenerationDisabled =>
       'Генерация временно недоступна, попробуйте позже';
+
+  @override
+  String get errorWorkerNotConfigured =>
+      'Сервис генерации не настроен, обратитесь к администратору';
 }

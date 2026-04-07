@@ -255,6 +255,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Генерация временно недоступна, попробуйте позже'**
   String get errorGenerationDisabled;
+
+  /// No description provided for @errorWorkerNotConfigured.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сервис генерации не настроен, обратитесь к администратору'**
+  String get errorWorkerNotConfigured;
 }
 
 class _AppLocalizationsDelegate

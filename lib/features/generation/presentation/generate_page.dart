@@ -807,6 +807,7 @@ class _ErrorCard extends StatelessWidget {
         SafetyBlockException() => l10n.errorSafetyBlock,
         NetworkException() => l10n.errorNetwork,
         GenerationDisabledException() => l10n.errorGenerationDisabled,
+        WorkerNotConfiguredException() => l10n.errorWorkerNotConfigured,
         ServerException() || NoImageGeneratedException() => l10n.errorServer,
         _ => l10n.errorServer,
       };
