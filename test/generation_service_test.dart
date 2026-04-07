@@ -43,6 +43,7 @@ void main() {
         httpClient: MockClient((_) async => throw StateError('should not be called')),
       );
 
+      // Synchronous throw — no HTTP call is made.
       expect(
         () => service.generateCover(prompt: 'test', format: 'long'),
         throwsA(isA<WorkerNotConfiguredException>()),
@@ -55,8 +56,8 @@ void main() {
         httpClient: _clientReturningRaw(429, ''),
       );
 
-      expect(
-        () => service.generateCover(prompt: 'test', format: 'long'),
+      await expectLater(
+        service.generateCover(prompt: 'test', format: 'long'),
         throwsA(isA<QuotaExceededException>()),
       );
     });
@@ -67,8 +68,8 @@ void main() {
         httpClient: _clientReturningRaw(451, ''),
       );
 
-      expect(
-        () => service.generateCover(prompt: 'test', format: 'long'),
+      await expectLater(
+        service.generateCover(prompt: 'test', format: 'long'),
         throwsA(isA<SafetyBlockException>()),
       );
     });
@@ -79,8 +80,8 @@ void main() {
         httpClient: _clientReturningRaw(422, ''),
       );
 
-      expect(
-        () => service.generateCover(prompt: 'test', format: 'long'),
+      await expectLater(
+        service.generateCover(prompt: 'test', format: 'long'),
         throwsA(isA<NoImageGeneratedException>()),
       );
     });
@@ -91,8 +92,8 @@ void main() {
         httpClient: _clientReturningRaw(500, ''),
       );
 
-      expect(
-        () => service.generateCover(prompt: 'test', format: 'long'),
+      await expectLater(
+        service.generateCover(prompt: 'test', format: 'long'),
         throwsA(isA<ServerException>()),
       );
     });
@@ -103,8 +104,8 @@ void main() {
         httpClient: _clientReturningRaw(200, 'not json {{'),
       );
 
-      expect(
-        () => service.generateCover(prompt: 'test', format: 'long'),
+      await expectLater(
+        service.generateCover(prompt: 'test', format: 'long'),
         throwsA(isA<ServerException>()),
       );
     });
@@ -115,8 +116,8 @@ void main() {
         httpClient: _clientReturning(200, {'mimeType': 'image/png'}),
       );
 
-      expect(
-        () => service.generateCover(prompt: 'test', format: 'long'),
+      await expectLater(
+        service.generateCover(prompt: 'test', format: 'long'),
         throwsA(isA<NoImageGeneratedException>()),
       );
     });
@@ -127,8 +128,8 @@ void main() {
         httpClient: _clientReturning(200, {'imageBase64': 'aGVsbG8='}),
       );
 
-      expect(
-        () => service.generateCover(prompt: 'test', format: 'long'),
+      await expectLater(
+        service.generateCover(prompt: 'test', format: 'long'),
         throwsA(isA<ServerException>()),
       );
     });
@@ -139,6 +140,7 @@ void main() {
         httpClient: MockClient((_) async => throw StateError('should not be called')),
       );
 
+      // Synchronous throw — validation happens before the HTTP call.
       expect(
         () => service.generateCover(
           prompt: 'test',

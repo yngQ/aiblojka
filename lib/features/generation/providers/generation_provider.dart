@@ -128,7 +128,8 @@ class GenerationNotifier extends _$GenerationNotifier {
   }
 
   void reset() {
-    state = const AsyncValue.data(null);
+    // Re-run build() so kill-switch / worker-URL guards are re-evaluated.
+    ref.invalidateSelf();
   }
 }
 

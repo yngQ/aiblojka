@@ -922,7 +922,7 @@ class _HistorySection extends ConsumerWidget {
               return Padding(
                 padding: EdgeInsets.only(right: index < entries.length - 1 ? 8 : 0),
                 child: Tooltip(
-                  message: entry.prompt.isNotEmpty ? entry.prompt : '',
+                  message: entry.prompt,
                   preferBelow: false,
                   child: GestureDetector(
                     onTap: () => onDownload(entry.imageBase64, entry.mimeType),

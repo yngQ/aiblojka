@@ -6,8 +6,8 @@ final class HistoryEntry {
     required this.imageBase64,
     required this.mimeType,
     required this.format,
-    required this.createdAt,
     required this.prompt,
+    required this.createdAt,
     this.style,
   });
 
