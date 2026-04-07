@@ -161,6 +161,9 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   Widget build(BuildContext context) {
     final generationState = ref.watch(generationNotifierProvider);
     final isLoading = generationState.isLoading;
+    final stateError = generationState.error;
+    final isPermanentlyBlocked = stateError is WorkerNotConfiguredException ||
+        stateError is GenerationDisabledException;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -211,6 +214,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                         _GenerateButton(
                           isLoading: isLoading,
                           onPressed: isLoading ||
+                                  isPermanentlyBlocked ||
                                   _promptController.text.trim().isEmpty
                               ? null
                               : _generate,
@@ -915,30 +919,37 @@ class _HistorySection extends ConsumerWidget {
               final thumbWidth = isLong
                   ? _kHistoryRowHeight * _kAspectLong
                   : _kHistoryRowHeight * _kAspectShort;
-              return Padding(
-                padding: EdgeInsets.only(right: index < entries.length - 1 ? 8 : 0),
-                child: GestureDetector(
-                  onTap: () => onDownload(entry.imageBase64, entry.mimeType),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
-                    child: SizedBox(
-                      width: thumbWidth,
-                      height: _kHistoryRowHeight,
-                      child: Image.memory(
-                        entry.imageBytes,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          color: AppColors.surface,
-                          child: const Icon(
-                            Icons.broken_image_outlined,
-                            color: AppColors.disabled,
-                            size: 24,
-                          ),
+              final thumb = GestureDetector(
+                onTap: () => onDownload(entry.imageBase64, entry.mimeType),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
+                  child: SizedBox(
+                    width: thumbWidth,
+                    height: _kHistoryRowHeight,
+                    child: Image.memory(
+                      entry.imageBytes,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        color: AppColors.surface,
+                        child: const Icon(
+                          Icons.broken_image_outlined,
+                          color: AppColors.disabled,
+                          size: 24,
                         ),
                       ),
                     ),
                   ),
                 ),
+              );
+              return Padding(
+                padding: EdgeInsets.only(right: index < entries.length - 1 ? 8 : 0),
+                child: entry.prompt.isEmpty
+                    ? thumb
+                    : Tooltip(
+                        message: entry.prompt,
+                        preferBelow: false,
+                        child: thumb,
+                      ),
               );
             },
           ),

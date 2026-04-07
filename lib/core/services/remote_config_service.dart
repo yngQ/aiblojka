@@ -35,15 +35,27 @@ const _kDefaults = <String, dynamic>{
 };
 
 class RemoteConfigService {
-  RemoteConfigService() : _rc = FirebaseRemoteConfig.instance;
+  RemoteConfigService()
+      : _rc = FirebaseRemoteConfig.instance,
+        _overrides = const {};
 
   /// Creates a [RemoteConfigService] that uses compile-time defaults and never
   /// touches Firebase. Use this in widget tests to avoid requiring Firebase
   /// initialization.
   @visibleForTesting
-  RemoteConfigService.withDefaults() : _rc = null;
+  RemoteConfigService.withDefaults()
+      : _rc = null,
+        _overrides = const {};
+
+  /// Creates a [RemoteConfigService] with custom values merged on top of
+  /// compile-time defaults. Use this in unit tests to inject specific config.
+  @visibleForTesting
+  RemoteConfigService.withValues(Map<String, dynamic> overrides)
+      : _rc = null,
+        _overrides = Map.unmodifiable(overrides);
 
   final FirebaseRemoteConfig? _rc;
+  final Map<String, dynamic> _overrides;
 
   Future<void> initialize() async {
     if (_rc == null) return;
@@ -68,11 +80,14 @@ class RemoteConfigService {
   /// [initialize]. When [_rc] is null (test stub), falls back to the
   /// compile-time [_kDefaults] map.
   String getString(String key) =>
-      _rc?.getString(key) ?? (_kDefaults[key] as String? ?? '');
+      _rc?.getString(key) ??
+      (_overrides[key] as String? ?? _kDefaults[key] as String? ?? '');
 
   bool getBool(String key) =>
-      _rc?.getBool(key) ?? (_kDefaults[key] as bool? ?? false);
+      _rc?.getBool(key) ??
+      (_overrides[key] as bool? ?? _kDefaults[key] as bool? ?? false);
 
   int getInt(String key) =>
-      _rc?.getInt(key) ?? (_kDefaults[key] as int? ?? 0);
+      _rc?.getInt(key) ??
+      (_overrides[key] as int? ?? _kDefaults[key] as int? ?? 0);
 }

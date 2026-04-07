@@ -107,6 +107,7 @@ class GenerationNotifier extends _$GenerationNotifier {
               mimeType: result.mimeType,
               format: formatStr,
               style: style,
+              prompt: prompt,
               createdAt: DateTime.now(),
             ),
           );
@@ -127,7 +128,8 @@ class GenerationNotifier extends _$GenerationNotifier {
   }
 
   void reset() {
-    state = const AsyncValue.data(null);
+    // Re-run build() so kill-switch / worker-URL guards are re-evaluated.
+    ref.invalidateSelf();
   }
 }
 
