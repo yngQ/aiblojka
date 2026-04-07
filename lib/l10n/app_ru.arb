@@ -25,5 +25,7 @@
   "errorFileSize": "Файл должен быть JPEG, PNG или WebP, до 10 МБ",
   "generatingLabel": "Генерация...",
   "generatingIndicatorLabel": "Генерация обложки...",
-  "noStyleOption": "Без стиля"
+  "noStyleOption": "Без стиля",
+  "errorGenerationDisabled": "Генерация временно недоступна, попробуйте позже",
+  "errorWorkerNotConfigured": "Сервис генерации не настроен, обратитесь к администратору"
 }

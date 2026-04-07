@@ -6,8 +6,7 @@ import 'package:http/http.dart' as http;
 import '../errors/generation_errors.dart';
 import 'remote_config_service.dart';
 
-const _kDefaultWorkerUrl = 'http://localhost:8787';
-const _kWorkerUrlKey = 'cloudflare_worker_url';
+const _kWorkerUrlKey = rcKeyWorkerUrl;
 const _kRequestTimeout = Duration(seconds: 60);
 
 /// The result of a successful cover-generation call.
@@ -54,10 +53,10 @@ class GenerationService {
     String? referenceImageBase64,
     String? referenceMimeType,
   }) async {
-    final workerUrl = remoteConfig.getString(
-      _kWorkerUrlKey,
-      defaultValue: _kDefaultWorkerUrl,
-    );
+    final workerUrl = remoteConfig.getString(_kWorkerUrlKey);
+    if (workerUrl.isEmpty) {
+      throw const WorkerNotConfiguredException();
+    }
 
     final bool hasReference =
         referenceImageBase64 != null && referenceImageBase64.isNotEmpty;

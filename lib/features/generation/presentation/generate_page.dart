@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:web/web.dart' as web;
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/generation_errors.dart';
+import '../../../core/providers/services_providers.dart';
 import '../../../core/services/generation_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
@@ -143,6 +145,12 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     anchor.href = dataUri;
     anchor.download = 'cover.$ext';
     anchor.click();
+
+    unawaited(
+      ref.read(analyticsServiceProvider).logImageDownloaded(
+            format: _selectedFormat.apiString,
+          ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -800,6 +808,8 @@ class _ErrorCard extends StatelessWidget {
         QuotaExceededException() => l10n.errorLimitExceeded,
         SafetyBlockException() => l10n.errorSafetyBlock,
         NetworkException() => l10n.errorNetwork,
+        GenerationDisabledException() => l10n.errorGenerationDisabled,
+        WorkerNotConfiguredException() => l10n.errorWorkerNotConfigured,
         ServerException() || NoImageGeneratedException() => l10n.errorServer,
         _ => l10n.errorServer,
       };
