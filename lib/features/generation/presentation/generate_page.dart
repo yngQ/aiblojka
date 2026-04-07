@@ -148,7 +148,9 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
 
     final formatStr =
         _selectedFormat == GenerationFormat.long ? 'long' : 'short';
-    unawaited(ref.read(analyticsServiceProvider).logImageDownloaded(format: formatStr));
+    unawaited(
+      ref.read(analyticsServiceProvider).logImageDownloaded(format: formatStr),
+    );
   }
 
   // ---------------------------------------------------------------------------

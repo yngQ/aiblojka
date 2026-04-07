@@ -24,9 +24,16 @@ class PromptBuilder {
 
     String stylePrefix = '';
     if (style != null && style.isNotEmpty) {
+      // RC key convention: style value must match the suffix of 'style_<value>'
+      // (e.g. style='gaming' → key 'style_gaming'). Keep style enum values and
+      // RC keys in sync.
       final instruction = remoteConfig.getString('style_$style');
       if (instruction.isNotEmpty) stylePrefix = '$instruction ';
     }
+
+    // If Remote Config fetch failed and defaults weren't loaded, fall back to
+    // the raw user description so Gemini still receives a meaningful prompt.
+    if (template.isEmpty) return '$stylePrefix$userDescription';
 
     return template.replaceFirst('{prompt}', '$stylePrefix$userDescription');
   }

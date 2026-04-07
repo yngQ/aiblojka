@@ -16,7 +16,7 @@ class GenerationNotifier extends _$GenerationNotifier {
   @override
   AsyncValue<GenerationResult?> build() {
     final workerUrl = ref
-        .read(remoteConfigServiceProvider)
+        .watch(remoteConfigServiceProvider)
         .getString('cloudflare_worker_url');
     if (workerUrl.isEmpty) {
       return AsyncValue.error(
