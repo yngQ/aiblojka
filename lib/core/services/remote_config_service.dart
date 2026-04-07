@@ -37,9 +37,16 @@ const _kDefaults = <String, dynamic>{
 class RemoteConfigService {
   RemoteConfigService() : _rc = FirebaseRemoteConfig.instance;
 
-  final FirebaseRemoteConfig _rc;
+  /// Creates a [RemoteConfigService] that uses compile-time defaults and never
+  /// touches Firebase. Use this in widget tests to avoid requiring Firebase
+  /// initialization.
+  @visibleForTesting
+  RemoteConfigService.withDefaults() : _rc = null;
+
+  final FirebaseRemoteConfig? _rc;
 
   Future<void> initialize() async {
+    if (_rc == null) return;
     await _rc.setConfigSettings(
       RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 10),
@@ -57,11 +64,15 @@ class RemoteConfigService {
   }
 
   /// Returns the string value for [key].
-  /// Falls back to the compile-time defaults in [_kDefaults] (set via
-  /// [setDefaults]) when Remote Config has no value for the key.
-  String getString(String key) => _rc.getString(key);
+  /// In production, Firebase handles defaults via [setDefaults] called in
+  /// [initialize]. When [_rc] is null (test stub), falls back to the
+  /// compile-time [_kDefaults] map.
+  String getString(String key) =>
+      _rc?.getString(key) ?? (_kDefaults[key] as String? ?? '');
 
-  bool getBool(String key) => _rc.getBool(key);
+  bool getBool(String key) =>
+      _rc?.getBool(key) ?? (_kDefaults[key] as bool? ?? false);
 
-  int getInt(String key) => _rc.getInt(key);
+  int getInt(String key) =>
+      _rc?.getInt(key) ?? (_kDefaults[key] as int? ?? 0);
 }
