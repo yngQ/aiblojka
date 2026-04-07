@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:web/web.dart' as web;
 
 import 'package:aiblojka/core/providers/services_providers.dart';
 import 'package:aiblojka/core/services/analytics_service.dart';
@@ -13,7 +14,9 @@ import 'package:aiblojka/features/generation/presentation/generate_page.dart';
 import 'package:aiblojka/l10n/app_localizations.dart';
 
 void main() {
-  testWidgets('GeneratePage renders AiBlojka title', (WidgetTester tester) async {
+  setUp(() => web.window.localStorage.removeItem('aiblojka_history'));
+
+  testWidgets('GeneratePage shows app title', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
