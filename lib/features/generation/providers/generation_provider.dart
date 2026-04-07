@@ -135,7 +135,7 @@ class GenerationNotifier extends _$GenerationNotifier {
 // HistoryNotifier
 // ---------------------------------------------------------------------------
 
-@riverpod
+@Riverpod(keepAlive: true)
 class HistoryNotifier extends _$HistoryNotifier {
   @override
   List<HistoryEntry> build() {
@@ -145,10 +145,8 @@ class HistoryNotifier extends _$HistoryNotifier {
   /// Persists [entry] via [HistoryService] and prepends it to state.
   void add(HistoryEntry entry) {
     ref.read(historyServiceProvider).save(entry);
-    state = [entry, ...state];
-    if (state.length > 10) {
-      state = state.sublist(0, 10);
-    }
+    // State mirrors what the service persisted — reload to stay in sync.
+    state = ref.read(historyServiceProvider).loadAll();
   }
 
   /// Clears all history from storage and resets state.

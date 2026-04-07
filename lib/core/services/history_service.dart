@@ -43,7 +43,12 @@ class HistoryService {
   }
 
   void _persist(List<HistoryEntry> entries) {
-    final json = jsonEncode(entries.map((e) => e.toJson()).toList());
-    web.window.localStorage.setItem(_kStorageKey, json);
+    try {
+      final json = jsonEncode(entries.map((e) => e.toJson()).toList());
+      web.window.localStorage.setItem(_kStorageKey, json);
+    } catch (_) {
+      // QuotaExceededError or other storage failure — silently skip persistence.
+      // History is still available in memory for the current session.
+    }
   }
 }

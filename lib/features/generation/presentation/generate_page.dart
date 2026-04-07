@@ -849,7 +849,7 @@ class _ErrorCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 const double _kHistoryRowHeight = 100.0;
-const double _kHistoryThumbRadiuus = 8.0;
+const double _kHistoryThumbRadius = 8.0;
 // Aspect ratios for cover formats
 const double _kAspectLong = 16 / 9; // → thumb width ≈ 177 at 100 h (capped)
 const double _kAspectShort = 9 / 16; // → thumb width ≈ 56 at 100 h
@@ -920,7 +920,7 @@ class _HistorySection extends ConsumerWidget {
                 child: GestureDetector(
                   onTap: () => onDownload(entry.imageBase64, entry.mimeType),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(_kHistoryThumbRadiuus),
+                    borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
                     child: SizedBox(
                       width: thumbWidth,
                       height: _kHistoryRowHeight,
