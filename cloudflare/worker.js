@@ -50,12 +50,8 @@ export default {
       return handlePreflight(request);
     }
 
-    // Only POST is accepted for the generation endpoint.
-    if (request.method !== "POST") {
-      return errorResponse(405, "METHOD_NOT_ALLOWED", "Only POST is accepted.");
-    }
-
     // Origin validation — the trust boundary.
+    // Parsed early so CORS headers can be attached to all subsequent error responses.
     const origin = request.headers.get("Origin") ?? "";
     if (!isAllowedOrigin(origin)) {
       return errorResponse(
@@ -63,6 +59,11 @@ export default {
         "FORBIDDEN_ORIGIN",
         "Requests from this origin are not allowed."
       );
+    }
+
+    // Only POST is accepted for the generation endpoint.
+    if (request.method !== "POST") {
+      return errorResponseWithCors(405, "METHOD_NOT_ALLOWED", "Only POST is accepted.", origin);
     }
 
     // Guard: Workers AI binding must be configured.
@@ -313,7 +314,7 @@ function mapWorkersAiError(err, origin) {
   }
 
   if (message.includes("invalid") || message.includes("bad request")) {
-    return errorResponseWithCors(400, "BAD_REQUEST", rawMessage, origin);
+    return errorResponseWithCors(400, "BAD_REQUEST", "The request was rejected by the AI model.", origin);
   }
 
   console.error("Workers AI invocation failed:", rawMessage);

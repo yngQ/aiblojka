@@ -86,3 +86,24 @@ Requests from other origins get `403 FORBIDDEN_ORIGIN`.
 - `referenceImageBase64` is accepted by API contract, but currently ignored by
   this model (text-to-image generation only).
 
+---
+
+## Troubleshooting
+
+**Getting `CONFIGURATION_ERROR` (500)**
+The Workers AI binding `AI` is not configured. Go to Worker **Settings → Bindings**,
+add a Workers AI binding, and set the variable name to `AI`. Redeploy.
+
+**Getting `FORBIDDEN_ORIGIN` (403) during local development**
+Make sure Flutter is running with `fvm flutter run -d chrome` — this sends a
+proper `http://localhost:<port>` Origin header. Direct `curl` calls without an
+Origin header will also be blocked.
+
+**Getting `NO_IMAGE_GENERATED` (422)**
+The model did not produce an image. Simplify or rephrase the prompt description.
+
+**Request times out**
+Cloudflare Workers have a 30-second CPU wall-clock limit on the free plan.
+If image generation consistently times out, consider upgrading to the Workers
+Paid plan which removes the wall-clock limit.
+
