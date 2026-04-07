@@ -5,94 +5,50 @@ import 'package:aiblojka/core/services/remote_config_service.dart';
 
 void main() {
   group('PromptBuilder', () {
-    test('replaces {prompt} placeholder with user description', () {
-      final rc = RemoteConfigService.withValues({
-        'prompt_template_long': 'Make a cover. {prompt} High quality.',
-      });
+    test('returns raw description when no style is given', () {
+      final rc = RemoteConfigService.withDefaults();
       final builder = PromptBuilder(remoteConfig: rc);
 
-      final result = builder.build(
-        userDescription: 'a sunset over mountains',
-        format: 'long',
-      );
+      final result = builder.build(userDescription: 'a sunset over mountains');
 
-      expect(result, 'Make a cover. a sunset over mountains High quality.');
+      expect(result, 'a sunset over mountains');
     });
 
     test('prepends style instruction before user description', () {
       final rc = RemoteConfigService.withValues({
-        'prompt_template_long': 'Thumbnail. {prompt} No artifacts.',
         'style_gaming': 'Visual style: neon gaming.',
       });
       final builder = PromptBuilder(remoteConfig: rc);
 
       final result = builder.build(
         userDescription: 'esports match',
-        format: 'long',
         style: 'gaming',
       );
 
-      expect(
-        result,
-        'Thumbnail. Visual style: neon gaming. esports match No artifacts.',
-      );
+      expect(result, 'Visual style: neon gaming. esports match');
     });
 
-    test('uses short template for short format', () {
-      final rc = RemoteConfigService.withValues({
-        'prompt_template_short': 'Vertical cover. {prompt}',
-      });
-      final builder = PromptBuilder(remoteConfig: rc);
-
-      final result = builder.build(
-        userDescription: 'dance video',
-        format: 'short',
-      );
-
-      expect(result, 'Vertical cover. dance video');
-    });
-
-    test('falls back to raw description when template is empty', () {
-      final rc = RemoteConfigService.withValues({
-        'prompt_template_long': '',
-      });
-      final builder = PromptBuilder(remoteConfig: rc);
-
-      final result = builder.build(
-        userDescription: 'mountain landscape',
-        format: 'long',
-      );
-
-      expect(result, 'mountain landscape');
-    });
-
-    test('ignores style when style key is not in config at all', () {
-      final rc = RemoteConfigService.withValues({
-        'prompt_template_long': 'Cover. {prompt}',
-        // 'style_unknown' does not exist in defaults either
-      });
+    test('ignores style when key is not in config', () {
+      final rc = RemoteConfigService.withValues({});
       final builder = PromptBuilder(remoteConfig: rc);
 
       final result = builder.build(
         userDescription: 'travel vlog',
-        format: 'long',
         style: 'unknown_style',
       );
 
-      expect(result, 'Cover. travel vlog');
+      expect(result, 'travel vlog');
     });
 
-    test('no style: uses default template without prefix', () {
-      final rc = RemoteConfigService.withDefaults();
+    test('ignores style when style is null', () {
+      final rc = RemoteConfigService.withValues({
+        'style_gaming': 'Visual style: neon gaming.',
+      });
       final builder = PromptBuilder(remoteConfig: rc);
 
-      final result = builder.build(
-        userDescription: 'cooking tutorial',
-        format: 'long',
-      );
+      final result = builder.build(userDescription: 'cooking tutorial');
 
-      expect(result, contains('cooking tutorial'));
-      expect(result, isNot(contains('{prompt}')));
+      expect(result, 'cooking tutorial');
     });
   });
 }

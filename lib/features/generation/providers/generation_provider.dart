@@ -79,7 +79,6 @@ class GenerationNotifier extends _$GenerationNotifier {
 
     final fullPrompt = ref.read(promptBuilderProvider).build(
           userDescription: prompt,
-          format: formatStr,
           style: style,
         );
 
@@ -90,7 +89,6 @@ class GenerationNotifier extends _$GenerationNotifier {
       final result = await service.generateCover(
         prompt: fullPrompt,
         format: formatStr,
-        style: style,
         referenceImageBase64: referenceImageBase64,
         referenceMimeType: referenceMimeType,
       );

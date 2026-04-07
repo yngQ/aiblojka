@@ -20,7 +20,7 @@ final class HistoryEntry {
   /// Cover format: `'long'` (YouTube 16:9) or `'short'` (Shorts/TikTok 9:16).
   final String format;
 
-  /// The user's original prompt text (not the full assembled Gemini prompt).
+  /// The user's original prompt text.
   final String prompt;
 
   /// Timestamp when this generation was completed.
