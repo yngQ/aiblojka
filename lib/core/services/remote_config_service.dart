@@ -25,10 +25,14 @@ const _kDefaults = <String, dynamic>{
       'Visual style: bold colors, eye-catching entertainment style, fun and engaging.',
 };
 
-class RemoteConfigService {
-  RemoteConfigService();
+// Remote Config key constants — shared across the app to avoid magic strings.
+const rcKeyWorkerUrl = 'cloudflare_worker_url';
+const rcKeyGenerationEnabled = 'generation_enabled';
 
-  FirebaseRemoteConfig get _rc => FirebaseRemoteConfig.instance;
+class RemoteConfigService {
+  RemoteConfigService() : _rc = FirebaseRemoteConfig.instance;
+
+  final FirebaseRemoteConfig _rc;
 
   Future<void> initialize() async {
     await _rc.setConfigSettings(
@@ -46,10 +50,10 @@ class RemoteConfigService {
     }
   }
 
-  String getString(String key, {String defaultValue = ''}) {
-    final value = _rc.getString(key);
-    return value.isNotEmpty ? value : defaultValue;
-  }
+  /// Returns the string value for [key].
+  /// Falls back to the compile-time defaults in [_kDefaults] (set via
+  /// [setDefaults]) when Remote Config has no value for the key.
+  String getString(String key) => _rc.getString(key);
 
   bool getBool(String key) => _rc.getBool(key);
 

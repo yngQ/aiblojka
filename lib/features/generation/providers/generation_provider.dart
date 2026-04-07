@@ -6,6 +6,7 @@ import 'package:web/web.dart' as web;
 import '../../../core/errors/generation_errors.dart';
 import '../../../core/providers/services_providers.dart';
 import '../../../core/services/generation_service.dart';
+import '../../../core/services/remote_config_service.dart';
 
 part 'generation_provider.g.dart';
 
@@ -15,12 +16,16 @@ enum GenerationFormat { long, short }
 class GenerationNotifier extends _$GenerationNotifier {
   @override
   AsyncValue<GenerationResult?> build() {
-    final workerUrl = ref
-        .watch(remoteConfigServiceProvider)
-        .getString('cloudflare_worker_url');
-    if (workerUrl.isEmpty) {
+    final remoteConfig = ref.read(remoteConfigServiceProvider);
+    if (remoteConfig.getString(rcKeyWorkerUrl).isEmpty) {
       return AsyncValue.error(
         const WorkerNotConfiguredException(),
+        StackTrace.current,
+      );
+    }
+    if (!remoteConfig.getBool(rcKeyGenerationEnabled)) {
+      return AsyncValue.error(
+        const GenerationDisabledException(),
         StackTrace.current,
       );
     }
@@ -40,7 +45,16 @@ class GenerationNotifier extends _$GenerationNotifier {
     }
 
     final remoteConfig = ref.read(remoteConfigServiceProvider);
-    if (!remoteConfig.getBool('generation_enabled')) {
+    // Guards duplicated from build() — the generate button doesn't disable
+    // on error state, so we re-check here to prevent actual API calls.
+    if (remoteConfig.getString(rcKeyWorkerUrl).isEmpty) {
+      state = AsyncValue.error(
+        const WorkerNotConfiguredException(),
+        StackTrace.current,
+      );
+      return;
+    }
+    if (!remoteConfig.getBool(rcKeyGenerationEnabled)) {
       state = AsyncValue.error(
         const GenerationDisabledException(),
         StackTrace.current,

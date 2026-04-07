@@ -1,22 +1,17 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 
 class AnalyticsService {
-  AnalyticsService();
+  AnalyticsService() : _analytics = FirebaseAnalytics.instance;
 
-  FirebaseAnalytics get _analytics => FirebaseAnalytics.instance;
+  final FirebaseAnalytics _analytics;
 
   Future<void> logGenerationStarted({
     required String format,
     String? style,
   }) async {
-    await _analytics.logEvent(
-      name: 'generation_started',
-      parameters: {
-        'format': format,
-        // ignore: use_null_aware_elements
-        if (style != null) 'style': style,
-      },
-    );
+    final params = <String, Object>{'format': format};
+    if (style != null) params['style'] = style;
+    await _analytics.logEvent(name: 'generation_started', parameters: params);
   }
 
   Future<void> logGenerationSuccess({
@@ -24,15 +19,12 @@ class AnalyticsService {
     String? style,
     required int durationMs,
   }) async {
-    await _analytics.logEvent(
-      name: 'generation_success',
-      parameters: {
-        'format': format,
-        // ignore: use_null_aware_elements
-        if (style != null) 'style': style,
-        'duration_ms': durationMs,
-      },
-    );
+    final params = <String, Object>{
+      'format': format,
+      'duration_ms': durationMs,
+    };
+    if (style != null) params['style'] = style;
+    await _analytics.logEvent(name: 'generation_success', parameters: params);
   }
 
   Future<void> logGenerationError({required String errorType}) async {

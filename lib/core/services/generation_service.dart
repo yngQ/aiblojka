@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../errors/generation_errors.dart';
 import 'remote_config_service.dart';
 
-const _kWorkerUrlKey = 'cloudflare_worker_url';
+const _kWorkerUrlKey = rcKeyWorkerUrl;
 const _kRequestTimeout = Duration(seconds: 60);
 
 /// The result of a successful cover-generation call.
