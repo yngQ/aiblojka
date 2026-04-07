@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AiBlojka — a Flutter Web PWA for AI-powered video cover generation. Single-page app (no auth) that sends prompts through a Cloudflare Worker proxy to Gemini API. UI language is Russian; prompts to Gemini are in English.
+AiBlojka — a Flutter Web PWA for AI-powered video cover generation. Single-page app (no auth) that sends prompts through a Cloudflare Worker proxy to Cloudflare Workers AI. UI language is Russian; prompts to the AI model are in English.
 
 ## Development Commands
 
@@ -20,7 +20,7 @@ fvm flutter pub get                # Install dependencies
 
 ## Architecture
 
-**Data flow:** Flutter Web (GitHub Pages) → Cloudflare Worker (proxy, holds API key) → Gemini 2.5 Flash Image API
+**Data flow:** Flutter Web (GitHub Pages) → Cloudflare Worker (proxy) → Workers AI (`@cf/black-forest-labs/flux-2-klein-4b`)
 
 **Config & analytics:** Firebase Remote Config (prompt templates, styles, kill switch) + Firebase Analytics → Flutter Web
 

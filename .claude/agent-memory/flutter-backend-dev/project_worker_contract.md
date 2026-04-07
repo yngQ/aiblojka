@@ -6,8 +6,9 @@ type: project
 
 The AiBlojka Cloudflare Worker lives at `cloudflare/worker.js` and is deployed via the Cloudflare Dashboard (paste-and-deploy, no CLI required for normal workflow).
 
-**Backend:** Cloudflare Workers AI — model `@cf/black-forest-labs/flux-1-schnell`.
+**Backend:** Cloudflare Workers AI — model `@cf/black-forest-labs/flux-2-klein-4b`.
 Requires a Workers AI binding named `AI` (`env.AI.run`). No external API key needed.
+Uses multipart/form-data via `env.AI.run(model, { multipart: { body: FormData, contentType } })`.
 
 **Allowed origins:**
 - `https://yngq.github.io` — production (GitHub Pages, real domain for this project)
@@ -20,11 +21,12 @@ Requires a Workers AI binding named `AI` (`env.AI.run`). No external API key nee
 - `prompt` is the raw user concept (with optional style prefix from Remote Config). The Worker wraps it internally with format instructions and quality requirements.
 - `referenceImageBase64` is optional; raw base64, no data URI prefix; max ~10 MB decoded
 - `referenceMimeType` is required when `referenceImageBase64` is present; one of: `image/jpeg`, `image/png`, `image/webp`
-- Note: `referenceImageBase64` is accepted but currently ignored by `flux-1-schnell` (text-to-image only)
+- `format` controls output dimensions: `long` → 1024×576, `short` → 576×1024
+- Note: `referenceImageBase64` is accepted but reference-image pass-through is not yet implemented
 
 **Worker → Flutter success body:**
 ```json
-{ "imageBase64": "...", "mimeType": "image/jpeg" }
+{ "imageBase64": "...", "mimeType": "image/png" }
 ```
 
 **Worker → Flutter error body:**

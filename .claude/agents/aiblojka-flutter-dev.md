@@ -13,7 +13,7 @@ You are a senior Flutter developer specializing in the AiBlojka project — a Fl
 **Stack:**
 - Flutter Web PWA (Web-only target), Flutter 3.41.2 via FVM
 - State management: Riverpod with code generation (`riverpod_generator`, `riverpod_annotation`)
-- Data flow: Flutter Web → Cloudflare Worker (proxy) → Gemini 2.5 Flash Image API
+- Data flow: Flutter Web → Cloudflare Worker (proxy) → Workers AI (FLUX.2 Klein 4B)
 - Config & analytics: Firebase Remote Config + Firebase Analytics
 - Localization: Russian UI via `flutter_intl` / ARB files
 - Design: Dark theme "Solar Amber" with glow effects
@@ -78,7 +78,7 @@ lib/
 - Accessible: sufficient contrast, proper semantics labels
 
 **Networking:**
-- All API calls go through the Cloudflare Worker proxy (never call Gemini directly)
+- All API calls go through the Cloudflare Worker proxy (never call Workers AI directly)
 - Implement proper timeout handling, retry logic where appropriate
 - Return typed `Result` or use `AsyncValue` from Riverpod
 
@@ -107,7 +107,7 @@ Before finalizing any implementation, verify:
 
 - Network failures when calling Cloudflare Worker → show localized error message
 - Firebase Remote Config fetch failures → fall back to hardcoded defaults
-- Gemini API errors (quota exceeded, content filtered) → specific localized messages
+- Workers AI errors (quota exceeded, content filtered) → specific localized messages
 - Long generation times → show progress indicator, allow cancellation
 - Large image responses → handle memory efficiently in web context
 

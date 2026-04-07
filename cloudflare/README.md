@@ -6,7 +6,7 @@ Cloudflare Workers AI image generation.
 It keeps the same API contract for Flutter:
 
 - request: `POST` JSON with `prompt`, `format`, optional `referenceImageBase64`
-- success: `{ "imageBase64": "...", "mimeType": "image/jpeg" }`
+- success: `{ "imageBase64": "...", "mimeType": "image/png" }`
 
 ---
 
@@ -82,9 +82,10 @@ Requests from other origins get `403 FORBIDDEN_ORIGIN`.
 
 ## Known Behavior
 
-- The selected model is `@cf/black-forest-labs/flux-1-schnell`.
-- `referenceImageBase64` is accepted by API contract, but currently ignored by
-  this model (text-to-image generation only).
+- The selected model is `@cf/black-forest-labs/flux-2-klein-4b`.
+- Image dimensions are set by `format`: `long` → 1024×576 (16:9), `short` → 576×1024 (9:16).
+- `referenceImageBase64` is accepted by API contract, but reference-image
+  pass-through to the model is not yet implemented.
 
 ---
 

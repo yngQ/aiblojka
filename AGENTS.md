@@ -20,7 +20,7 @@ fvm flutter pub get                # Install dependencies
 
 ## Architecture
 
-**Data flow:** Flutter Web (GitHub Pages) → Cloudflare Worker (proxy) → Workers AI (`@cf/black-forest-labs/flux-1-schnell`)
+**Data flow:** Flutter Web (GitHub Pages) → Cloudflare Worker (proxy) → Workers AI (`@cf/black-forest-labs/flux-2-klein-4b`)
 
 **Config & analytics:** Firebase Remote Config (style instructions, kill switch) + Firebase Analytics → Flutter Web
 

@@ -17,8 +17,14 @@
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Cloudflare Workers AI model id (fast and suitable for free-tier usage). */
-const WORKERS_AI_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+/** Cloudflare Workers AI model id (supports width/height and reference images). */
+const WORKERS_AI_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
+
+/** Output image dimensions per format (px). */
+const FORMAT_DIMENSIONS = {
+  long:  { width: 1024, height: 576 },  // 16:9 landscape
+  short: { width: 576,  height: 1024 }, // 9:16 portrait
+};
 
 /** Production GitHub Pages origin for this project. */
 const PRODUCTION_ORIGIN = "https://yngq.github.io";
@@ -29,8 +35,8 @@ const MAX_BODY_BYTES = 12 * 1024 * 1024;
 /** Maximum prompt length in characters. */
 const MAX_PROMPT_LENGTH = 2000;
 
-/** Output MIME type returned by FLUX.1 schnell payload image string. */
-const OUTPUT_MIME_TYPE = "image/jpeg";
+/** Output MIME type returned by FLUX.2 Klein payload image string. */
+const OUTPUT_MIME_TYPE = "image/png";
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -85,18 +91,24 @@ export default {
       return errorResponseWithCors(400, "INVALID_REQUEST", err.message, origin);
     }
 
-    const aiInput = buildWorkersAiInput(body);
+    const form = buildWorkersAiInput(body);
 
-    // Optional reference images are currently ignored by the selected model.
+    // Reference images: FLUX.2 Klein supports input_image_0..3 as Blobs,
+    // but the client sends base64. Conversion is not yet implemented.
     if (body.referenceImageBase64) {
       console.warn(
-        "referenceImageBase64 was provided, but the selected Workers AI model does not support image conditioning; reference image is ignored."
+        "referenceImageBase64 was provided, but reference-image pass-through is not yet implemented; reference image is ignored."
       );
     }
 
     let aiResult;
     try {
-      aiResult = await env.AI.run(WORKERS_AI_MODEL, aiInput);
+      aiResult = await env.AI.run(WORKERS_AI_MODEL, {
+        multipart: {
+          body: form,
+          contentType: "multipart/form-data",
+        },
+      });
     } catch (err) {
       return mapWorkersAiError(err, origin);
     }
@@ -254,10 +266,10 @@ async function parseAndValidateBody(request) {
 // ---------------------------------------------------------------------------
 
 /**
- * Builds Workers AI model input.
+ * Builds Workers AI model input as FormData (required by FLUX.2 Klein).
  *
  * @param {{ prompt: string, format: "long" | "short" }} input
- * @returns {{ prompt: string, steps: number }}
+ * @returns {FormData}
  */
 function buildWorkersAiInput(input) {
   const formatInstruction =
@@ -272,11 +284,14 @@ function buildWorkersAiInput(input) {
     `Style requirements: high contrast, clear focal subject, clean composition, professional quality. ` +
     `Do not add watermarks, logos, or accidental text unless explicitly requested.`;
 
-  return {
-    prompt: fullPrompt,
-    // FLUX.1 schnell: default 4, max 8.
-    steps: 4,
-  };
+  const dimensions = FORMAT_DIMENSIONS[input.format];
+
+  const form = new FormData();
+  form.append("prompt", fullPrompt);
+  form.append("width", String(dimensions.width));
+  form.append("height", String(dimensions.height));
+
+  return form;
 }
 
 /**
