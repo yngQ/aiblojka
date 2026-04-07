@@ -24,5 +24,6 @@
   "errorNetwork": "Проверьте подключение к интернету",
   "errorFileSize": "Файл должен быть JPEG, PNG или WebP, до 10 МБ",
   "generatingLabel": "Генерация...",
+  "generatingIndicatorLabel": "Генерация обложки...",
   "noStyleOption": "Без стиля"
 }

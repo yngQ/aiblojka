@@ -208,6 +208,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                               : _generate,
                         ),
                         const SizedBox(height: 24),
+                        if (isLoading) const _GeneratingIndicator(),
                         generationState.when(
                           data: (result) {
                             if (result == null) return const SizedBox.shrink();
@@ -615,44 +616,97 @@ class _GenerateButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-                isEnabled ? AppColors.primary : AppColors.disabled,
+            backgroundColor: isEnabled ? AppColors.primary : AppColors.disabled,
             foregroundColor: isEnabled ? AppColors.background : AppColors.textSecondary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: 0,
           ),
-          child: isLoading
-              ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(AppColors.accent),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      l10n.generatingLabel,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                )
-              : Text(
-                  l10n.generateButton,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+          child: Text(
+            isLoading ? l10n.generatingLabel : l10n.generateButton,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _GeneratingIndicator
+// ---------------------------------------------------------------------------
+
+const double _kGlowMinOpacity = 0.15;
+const double _kGlowMaxOpacity = 0.55;
+const int _kGlowPulseDurationMs = 1200;
+const double _kGlowIndicatorBlur = 24.0;
+const double _kGlowIndicatorSpread = 4.0;
+
+class _GeneratingIndicator extends StatefulWidget {
+  const _GeneratingIndicator();
+
+  @override
+  State<_GeneratingIndicator> createState() => _GeneratingIndicatorState();
+}
+
+class _GeneratingIndicatorState extends State<_GeneratingIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _glowOpacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _kGlowPulseDurationMs),
+    )..repeat(reverse: true);
+
+    _glowOpacity = Tween<double>(
+      begin: _kGlowMinOpacity,
+      end: _kGlowMaxOpacity,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AnimatedBuilder(
+      animation: _glowOpacity,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(_kCardRadius),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: _glowOpacity.value),
+                blurRadius: _kGlowIndicatorBlur,
+                spreadRadius: _kGlowIndicatorSpread,
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
+      child: Center(
+        child: Text(
+          l10n.generatingIndicatorLabel,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+          ),
         ),
       ),
     );
@@ -685,7 +739,7 @@ class _ResultSection extends StatelessWidget {
           child: Image.memory(
             result.imageBytes,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, _) => const SizedBox.shrink(),
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
           ),
         ),
         const SizedBox(height: 16),

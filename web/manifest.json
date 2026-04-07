@@ -1,12 +1,12 @@
 {
-    "name": "aiblojka",
-    "short_name": "aiblojka",
+    "name": "AiBlojka",
+    "short_name": "AiBlojka",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0E0C08",
+    "theme_color": "#FF8F00",
+    "description": "AI-генератор обложек для видео",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

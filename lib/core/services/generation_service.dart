@@ -92,7 +92,13 @@ class GenerationService {
     } on TimeoutException {
       throw const NetworkException('Request timed out. Please try again.');
     } on http.ClientException {
-      throw const NetworkException();
+      // In a browser all HTTP failures — connection refused, CORS, actual
+      // offline — surface as ClientException with the same generic message
+      // ("XMLHttpRequest error."), so message-based discrimination is not
+      // possible. The caller's navigator.onLine guard already handles the
+      // true-offline case; anything reaching here with the network up is a
+      // server / configuration problem.
+      throw const ServerException();
     }
 
     return _handleResponse(response);

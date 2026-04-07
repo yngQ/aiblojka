@@ -238,6 +238,12 @@ abstract class AppLocalizations {
   /// **'Генерация...'**
   String get generatingLabel;
 
+  /// No description provided for @generatingIndicatorLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Генерация обложки...'**
+  String get generatingIndicatorLabel;
+
   /// No description provided for @noStyleOption.
   ///
   /// In ru, this message translates to:
