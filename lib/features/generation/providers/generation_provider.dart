@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:web/web.dart' as web;
 
 import '../../../core/errors/generation_errors.dart';
+import '../../../core/models/history_entry.dart';
 import '../../../core/providers/services_providers.dart';
 import '../../../core/services/generation_service.dart';
 import '../../../core/services/remote_config_service.dart';
@@ -100,6 +101,15 @@ class GenerationNotifier extends _$GenerationNotifier {
         durationMs: durationMs,
       ));
       state = AsyncValue.data(result);
+      ref.read(historyNotifierProvider.notifier).add(
+            HistoryEntry(
+              imageBase64: result.imageBase64,
+              mimeType: result.mimeType,
+              format: formatStr,
+              style: style,
+              createdAt: DateTime.now(),
+            ),
+          );
     } catch (e, st) {
       final errorType = switch (e) {
         QuotaExceededException() => 'quota_exceeded',
@@ -118,5 +128,32 @@ class GenerationNotifier extends _$GenerationNotifier {
 
   void reset() {
     state = const AsyncValue.data(null);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryNotifier
+// ---------------------------------------------------------------------------
+
+@riverpod
+class HistoryNotifier extends _$HistoryNotifier {
+  @override
+  List<HistoryEntry> build() {
+    return ref.read(historyServiceProvider).loadAll();
+  }
+
+  /// Persists [entry] via [HistoryService] and prepends it to state.
+  void add(HistoryEntry entry) {
+    ref.read(historyServiceProvider).save(entry);
+    state = [entry, ...state];
+    if (state.length > 10) {
+      state = state.sublist(0, 10);
+    }
+  }
+
+  /// Clears all history from storage and resets state.
+  void clear() {
+    ref.read(historyServiceProvider).clear();
+    state = [];
   }
 }

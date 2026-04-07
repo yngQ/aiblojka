@@ -261,6 +261,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Сервис генерации не настроен, обратитесь к администратору'**
   String get errorWorkerNotConfigured;
+
+  /// No description provided for @historySectionTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'История'**
+  String get historySectionTitle;
+
+  /// No description provided for @historyClearButton.
+  ///
+  /// In ru, this message translates to:
+  /// **'Очистить'**
+  String get historyClearButton;
 }
 
 class _AppLocalizationsDelegate
