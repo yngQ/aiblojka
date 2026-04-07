@@ -36,9 +36,9 @@ final class HistoryEntry {
         'imageBase64': imageBase64,
         'mimeType': mimeType,
         'format': format,
-        'style': style,
         'prompt': prompt,
         'createdAt': createdAt.toIso8601String(),
+        'style': style,
       };
 
   factory HistoryEntry.fromJson(Map<String, dynamic> json) => HistoryEntry(
