@@ -207,11 +207,8 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                               ? null
                               : _generate,
                         ),
-                        if (isLoading) ...[
-                          const SizedBox(height: 24),
-                          const _GeneratingIndicator(),
-                        ] else
-                          const SizedBox(height: 24),
+                        const SizedBox(height: 24),
+                        if (isLoading) const _GeneratingIndicator(),
                         generationState.when(
                           data: (result) {
                             if (result == null) return const SizedBox.shrink();
