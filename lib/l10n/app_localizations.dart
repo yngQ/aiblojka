@@ -249,6 +249,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Без стиля'**
   String get noStyleOption;
+
+  /// No description provided for @errorGenerationDisabled.
+  ///
+  /// In ru, this message translates to:
+  /// **'Генерация временно недоступна, попробуйте позже'**
+  String get errorGenerationDisabled;
 }
 
 class _AppLocalizationsDelegate

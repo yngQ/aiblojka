@@ -47,3 +47,10 @@ final class NetworkException extends GenerationException {
     super.message = 'Network error. Please check your connection and try again.',
   ]);
 }
+
+/// Generation is disabled via Remote Config kill switch.
+final class GenerationDisabledException extends GenerationException {
+  const GenerationDisabledException([
+    super.message = 'Generation is currently disabled. Please try again later.',
+  ]);
+}

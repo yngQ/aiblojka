@@ -1,20 +1,21 @@
-// TODO: Реализовать AnalyticsService после подключения Firebase
-// Сервис логирует события в Firebase Analytics:
-// - generation_started (format, style)
-// - generation_success (format, style, duration_ms)
-// - generation_error (error_type)
-// - image_downloaded (format)
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 class AnalyticsService {
   AnalyticsService();
 
-  // TODO: инжектировать FirebaseAnalytics
+  FirebaseAnalytics get _analytics => FirebaseAnalytics.instance;
 
   Future<void> logGenerationStarted({
     required String format,
     String? style,
   }) async {
-    // TODO: FirebaseAnalytics.logEvent
+    await _analytics.logEvent(
+      name: 'generation_started',
+      parameters: {
+        'format': format,
+        if (style != null) 'style': style,
+      },
+    );
   }
 
   Future<void> logGenerationSuccess({
@@ -22,14 +23,27 @@ class AnalyticsService {
     String? style,
     required int durationMs,
   }) async {
-    // TODO: FirebaseAnalytics.logEvent
+    await _analytics.logEvent(
+      name: 'generation_success',
+      parameters: {
+        'format': format,
+        if (style != null) 'style': style,
+        'duration_ms': durationMs,
+      },
+    );
   }
 
   Future<void> logGenerationError({required String errorType}) async {
-    // TODO: FirebaseAnalytics.logEvent
+    await _analytics.logEvent(
+      name: 'generation_error',
+      parameters: {'error_type': errorType},
+    );
   }
 
   Future<void> logImageDownloaded({required String format}) async {
-    // TODO: FirebaseAnalytics.logEvent
+    await _analytics.logEvent(
+      name: 'image_downloaded',
+      parameters: {'format': format},
+    );
   }
 }

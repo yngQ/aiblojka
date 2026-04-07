@@ -3,28 +3,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/providers/services_providers.dart';
+import 'core/services/remote_config_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/generation/presentation/generate_page.dart';
+import 'firebase_options.dart';
 import 'l10n/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // TODO: подключить google-services после настройки Firebase
-  try {
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: 'placeholder',
-        appId: 'placeholder',
-        messagingSenderId: 'placeholder',
-        projectId: 'placeholder',
-      ),
-    );
-  } catch (_) {
-    // Firebase недоступен в dev-режиме без реального конфига — продолжаем.
-  }
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  runApp(const ProviderScope(child: AiBlojkaApp()));
+  final remoteConfigService = RemoteConfigService();
+  await remoteConfigService.initialize();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        remoteConfigServiceProvider.overrideWithValue(remoteConfigService),
+      ],
+      child: const AiBlojkaApp(),
+    ),
+  );
 }
 
 class AiBlojkaApp extends StatelessWidget {
