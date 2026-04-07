@@ -30,7 +30,7 @@ compatibility_date = "2024-09-23"
 
 # [vars]
 # Uncomment and use vars only for non-sensitive, environment-specific values.
-# ALLOWED_ORIGIN = "https://yngq.github.io"
+# ALLOWED_ORIGIN = "https://yngQ.github.io"
 
 # ---------------------------------------------------------------------------
 # Routes (optional)

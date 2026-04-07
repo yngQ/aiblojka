@@ -11,7 +11,7 @@ The AiBlojka Cloudflare Worker lives at `cloudflare/worker.js` and is deployed v
 API key passed as query param `?key=GEMINI_API_KEY`.
 
 **Allowed origins:**
-- `https://yngq.github.io` — production (GitHub Pages, real domain for this project)
+- `https://yngQ.github.io` — production (GitHub Pages, real domain for this project)
 - `http://localhost:*` — any local dev port
 
 **Flutter → Worker request body:**
