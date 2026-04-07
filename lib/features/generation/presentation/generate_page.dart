@@ -921,32 +921,55 @@ class _HistorySection extends ConsumerWidget {
                   : _kHistoryRowHeight * _kAspectShort;
               return Padding(
                 padding: EdgeInsets.only(right: index < entries.length - 1 ? 8 : 0),
-                child: Tooltip(
-                  message: entry.prompt,
-                  preferBelow: false,
-                  child: GestureDetector(
-                    onTap: () => onDownload(entry.imageBase64, entry.mimeType),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
-                      child: SizedBox(
-                        width: thumbWidth,
-                        height: _kHistoryRowHeight,
-                        child: Image.memory(
-                          entry.imageBytes,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            color: AppColors.surface,
-                            child: const Icon(
-                              Icons.broken_image_outlined,
-                              color: AppColors.disabled,
-                              size: 24,
+                child: entry.prompt.isEmpty
+                    ? GestureDetector(
+                        onTap: () => onDownload(entry.imageBase64, entry.mimeType),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
+                          child: SizedBox(
+                            width: thumbWidth,
+                            height: _kHistoryRowHeight,
+                            child: Image.memory(
+                              entry.imageBytes,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                color: AppColors.surface,
+                                child: const Icon(
+                                  Icons.broken_image_outlined,
+                                  color: AppColors.disabled,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Tooltip(
+                        message: entry.prompt,
+                        preferBelow: false,
+                        child: GestureDetector(
+                          onTap: () => onDownload(entry.imageBase64, entry.mimeType),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
+                            child: SizedBox(
+                              width: thumbWidth,
+                              height: _kHistoryRowHeight,
+                              child: Image.memory(
+                                entry.imageBytes,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Container(
+                                  color: AppColors.surface,
+                                  child: const Icon(
+                                    Icons.broken_image_outlined,
+                                    color: AppColors.disabled,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
               );
             },
           ),

@@ -7,8 +7,6 @@ import 'package:web/web.dart' as web;
 import 'package:aiblojka/core/models/history_entry.dart';
 import 'package:aiblojka/core/services/history_service.dart';
 
-const _kStorageKey = 'aiblojka_history';
-
 HistoryEntry _entry({
   String imageBase64 = 'aGVsbG8=',
   String mimeType = 'image/png',
@@ -29,7 +27,7 @@ void main() {
   late HistoryService service;
 
   setUp(() {
-    web.window.localStorage.removeItem(_kStorageKey);
+    web.window.localStorage.removeItem(kHistoryStorageKey);
     service = HistoryService();
   });
 
@@ -75,7 +73,7 @@ void main() {
     });
 
     test('loadAll returns empty list on corrupt JSON', () {
-      web.window.localStorage.setItem(_kStorageKey, 'not valid json {{');
+      web.window.localStorage.setItem(kHistoryStorageKey, 'not valid json {{');
 
       expect(service.loadAll(), isEmpty);
     });
@@ -83,7 +81,7 @@ void main() {
     test('fromJson tolerates missing prompt field (legacy entries)', () {
       // Simulate a localStorage entry without the prompt key.
       web.window.localStorage.setItem(
-        _kStorageKey,
+        kHistoryStorageKey,
         '[{"imageBase64":"aGVsbG8=","mimeType":"image/png","format":"long","style":null,"createdAt":"2024-01-01T00:00:00.000"}]',
       );
 

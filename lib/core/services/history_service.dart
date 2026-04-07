@@ -4,7 +4,9 @@ import 'package:web/web.dart' as web;
 
 import '../models/history_entry.dart';
 
-const _kStorageKey = 'aiblojka_history';
+/// The localStorage key used to persist generation history.
+/// Exposed so tests can reference the same key without duplicating the string.
+const kHistoryStorageKey = 'aiblojka_history';
 const _kHistoryLimit = 10;
 
 /// Persists the last [_kHistoryLimit] generation results in localStorage.
@@ -12,7 +14,7 @@ class HistoryService {
   /// Reads all stored entries. Returns them newest-first.
   /// Returns an empty list if storage is empty or the stored JSON is corrupt.
   List<HistoryEntry> loadAll() {
-    final raw = web.window.localStorage.getItem(_kStorageKey);
+    final raw = web.window.localStorage.getItem(kHistoryStorageKey);
     if (raw == null || raw.isEmpty) return [];
 
     try {
@@ -39,13 +41,13 @@ class HistoryService {
 
   /// Removes all history entries from localStorage.
   void clear() {
-    web.window.localStorage.removeItem(_kStorageKey);
+    web.window.localStorage.removeItem(kHistoryStorageKey);
   }
 
   void _persist(List<HistoryEntry> entries) {
     try {
       final json = jsonEncode(entries.map((e) => e.toJson()).toList());
-      web.window.localStorage.setItem(_kStorageKey, json);
+      web.window.localStorage.setItem(kHistoryStorageKey, json);
     } catch (_) {
       // QuotaExceededError or other storage failure — silently skip persistence.
       // History is still available in memory for the current session.
