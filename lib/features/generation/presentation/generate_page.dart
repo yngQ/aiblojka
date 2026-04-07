@@ -161,6 +161,9 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   Widget build(BuildContext context) {
     final generationState = ref.watch(generationNotifierProvider);
     final isLoading = generationState.isLoading;
+    final stateError = generationState.error;
+    final isPermanentlyBlocked = stateError is WorkerNotConfiguredException ||
+        stateError is GenerationDisabledException;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -211,6 +214,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                         _GenerateButton(
                           isLoading: isLoading,
                           onPressed: isLoading ||
+                                  isPermanentlyBlocked ||
                                   _promptController.text.trim().isEmpty
                               ? null
                               : _generate,
