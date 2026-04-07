@@ -7,6 +7,7 @@ final class HistoryEntry {
     required this.mimeType,
     required this.format,
     required this.createdAt,
+    required this.prompt,
     this.style,
   });
 
@@ -22,6 +23,9 @@ final class HistoryEntry {
   /// Optional style tag, e.g. `'gaming'`. Null means no style was selected.
   final String? style;
 
+  /// The user's original prompt text (not the full assembled Gemini prompt).
+  final String prompt;
+
   /// Timestamp when this generation was completed.
   final DateTime createdAt;
 
@@ -33,6 +37,7 @@ final class HistoryEntry {
         'mimeType': mimeType,
         'format': format,
         'style': style,
+        'prompt': prompt,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -41,6 +46,7 @@ final class HistoryEntry {
         mimeType: json['mimeType'] as String,
         format: json['format'] as String,
         style: json['style'] as String?,
+        prompt: (json['prompt'] as String?) ?? '',
         createdAt: DateTime.parse(json['createdAt'] as String),
       );
 }

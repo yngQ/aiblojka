@@ -107,6 +107,7 @@ class GenerationNotifier extends _$GenerationNotifier {
               mimeType: result.mimeType,
               format: formatStr,
               style: style,
+              prompt: prompt,
               createdAt: DateTime.now(),
             ),
           );
