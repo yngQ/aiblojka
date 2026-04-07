@@ -1,8 +1,5 @@
 import 'remote_config_service.dart';
 
-const _kTemplateLongKey = 'prompt_template_long';
-const _kTemplateShortKey = 'prompt_template_short';
-
 /// Assembles a full Gemini prompt from a Remote Config template,
 /// the user's free-text description, and an optional style instruction.
 ///
@@ -19,15 +16,13 @@ class PromptBuilder {
     String? style,
   }) {
     final templateKey =
-        format == 'long' ? _kTemplateLongKey : _kTemplateShortKey;
+        format == 'long' ? rcKeyTemplateLong : rcKeyTemplateShort;
     final template = remoteConfig.getString(templateKey);
 
     String stylePrefix = '';
     if (style != null && style.isNotEmpty) {
-      // RC key convention: style value must match the suffix of 'style_<value>'
-      // (e.g. style='gaming' → key 'style_gaming'). Keep style enum values and
-      // RC keys in sync.
-      final instruction = remoteConfig.getString('style_$style');
+      final instruction =
+          remoteConfig.getString('$rcStyleKeyPrefix$style');
       if (instruction.isNotEmpty) stylePrefix = '$instruction ';
     }
 

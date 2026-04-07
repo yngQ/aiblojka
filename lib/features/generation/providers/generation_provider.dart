@@ -12,6 +12,13 @@ part 'generation_provider.g.dart';
 
 enum GenerationFormat { long, short }
 
+extension GenerationFormatX on GenerationFormat {
+  String get apiString => switch (this) {
+        GenerationFormat.long => 'long',
+        GenerationFormat.short => 'short',
+      };
+}
+
 @riverpod
 class GenerationNotifier extends _$GenerationNotifier {
   @override
@@ -64,7 +71,7 @@ class GenerationNotifier extends _$GenerationNotifier {
 
     state = const AsyncValue.loading();
 
-    final formatStr = format == GenerationFormat.long ? 'long' : 'short';
+    final formatStr = format.apiString;
     final analytics = ref.read(analyticsServiceProvider);
 
     unawaited(analytics.logGenerationStarted(format: formatStr, style: style));

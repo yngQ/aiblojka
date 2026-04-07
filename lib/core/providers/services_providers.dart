@@ -27,7 +27,7 @@ RemoteConfigService remoteConfigService(Ref ref) => RemoteConfigService();
 /// [PromptBuilder] wired with [RemoteConfigService].
 @Riverpod(keepAlive: true)
 PromptBuilder promptBuilder(Ref ref) =>
-    PromptBuilder(remoteConfig: ref.watch(remoteConfigServiceProvider));
+    PromptBuilder(remoteConfig: ref.read(remoteConfigServiceProvider));
 
 /// [AnalyticsService] singleton.
 @Riverpod(keepAlive: true)

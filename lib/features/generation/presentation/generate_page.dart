@@ -146,10 +146,10 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     anchor.download = 'cover.$ext';
     anchor.click();
 
-    final formatStr =
-        _selectedFormat == GenerationFormat.long ? 'long' : 'short';
     unawaited(
-      ref.read(analyticsServiceProvider).logImageDownloaded(format: formatStr),
+      ref.read(analyticsServiceProvider).logImageDownloaded(
+            format: _selectedFormat.apiString,
+          ),
     );
   }
 
