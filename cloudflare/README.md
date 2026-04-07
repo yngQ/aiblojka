@@ -101,7 +101,7 @@ See `wrangler.toml` for the full configuration reference.
 ```
 POST <worker-url>
 Content-Type: application/json
-Origin: https://yngq.github.io
+Origin: https://yngQ.github.io
 ```
 
 ```json
@@ -158,7 +158,7 @@ Origin: https://yngq.github.io
 
 | Origin | Purpose |
 |--------|---------|
-| `https://yngq.github.io` | Production — GitHub Pages |
+| `https://yngQ.github.io` | Production — GitHub Pages |
 | `http://localhost:*` | Local Flutter development (`fvm flutter run -d chrome`) |
 
 Requests from any other origin receive a `403 FORBIDDEN_ORIGIN` response.

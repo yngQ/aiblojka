@@ -10,7 +10,7 @@
  *   GEMINI_API_KEY  — encrypted secret, Gemini API key
  *
  * Allowed origins:
- *   https://yngq.github.io   — production (GitHub Pages)
+ *   https://yngQ.github.io   — production (GitHub Pages)
  *   http://localhost:*        — any local dev port
  */
 
@@ -22,7 +22,7 @@ const GEMINI_ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent";
 
 /** Production GitHub Pages origin for this project. */
-const PRODUCTION_ORIGIN = "https://yngq.github.io";
+const PRODUCTION_ORIGIN = "https://yngQ.github.io";
 
 /** Maximum allowed request body size: 12 MB (10 MB image + JSON overhead). */
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
