@@ -50,4 +50,9 @@ class AnalyticsService {
       parameters: {'format': format},
     );
   }
+
+  Future<void> logReferenceImageUploaded() async {
+    if (_analytics == null) return;
+    await _analytics.logEvent(name: 'reference_image_uploaded');
+  }
 }
