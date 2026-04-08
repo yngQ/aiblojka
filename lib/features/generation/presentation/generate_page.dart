@@ -108,6 +108,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
       _referenceFileName = file.name;
       _referenceError = false;
     });
+    unawaited(ref.read(analyticsServiceProvider).logReferenceImageUploaded());
   }
 
   void _clearReferenceImage() {

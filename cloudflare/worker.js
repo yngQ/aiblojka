@@ -91,13 +91,15 @@ export default {
       return errorResponseWithCors(400, "INVALID_REQUEST", err.message, origin);
     }
 
-    const form = buildWorkersAiInput(body);
-
-    // Reference images: FLUX.2 Klein supports input_image_0..3 as Blobs,
-    // but the client sends base64. Conversion is not yet implemented.
-    if (body.referenceImageBase64) {
-      console.warn(
-        "referenceImageBase64 was provided, but reference-image pass-through is not yet implemented; reference image is ignored."
+    let form;
+    try {
+      form = buildWorkersAiInput(body);
+    } catch (err) {
+      return errorResponseWithCors(
+        400,
+        "INVALID_REQUEST",
+        "Invalid reference image encoding.",
+        origin
       );
     }
 
@@ -268,8 +270,9 @@ async function parseAndValidateBody(request) {
 /**
  * Builds Workers AI model input as FormData (required by FLUX.2 Klein).
  *
- * @param {{ prompt: string, format: "long" | "short" }} input
+ * @param {{ prompt: string, format: "long" | "short", referenceImageBase64?: string, referenceMimeType?: string }} input
  * @returns {FormData}
+ * @throws {DOMException} if referenceImageBase64 is not valid base64
  */
 function buildWorkersAiInput(input) {
   const formatInstruction =
@@ -277,9 +280,15 @@ function buildWorkersAiInput(input) {
       ? "Create a horizontal YouTube thumbnail in 16:9 landscape composition."
       : "Create a vertical short-video cover in 9:16 portrait composition.";
 
+  const referenceClause =
+    input.referenceImageBase64 && input.referenceMimeType
+      ? "Use the provided reference image as a visual style and composition guide. "
+      : "";
+
   const fullPrompt =
     `You are an expert video thumbnail designer. ` +
     `${formatInstruction} ` +
+    `${referenceClause}` +
     `User concept: ${input.prompt}. ` +
     `Style requirements: high contrast, clear focal subject, clean composition, professional quality. ` +
     `Do not add watermarks, logos, or accidental text unless explicitly requested.`;
@@ -290,6 +299,16 @@ function buildWorkersAiInput(input) {
   form.append("prompt", fullPrompt);
   form.append("width", String(dimensions.width));
   form.append("height", String(dimensions.height));
+
+  if (input.referenceImageBase64 && input.referenceMimeType) {
+    const binaryStr = atob(input.referenceImageBase64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: input.referenceMimeType });
+    form.append("input_image_0", blob);
+  }
 
   return form;
 }
