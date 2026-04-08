@@ -5,7 +5,7 @@ Cloudflare Workers AI image generation.
 
 It keeps the same API contract for Flutter:
 
-- request: `POST` JSON with `prompt`, `format`, optional `referenceImageBase64`
+- request: `POST` JSON with `prompt`, `format`, optional `referenceImageBase64` (requires `referenceMimeType`)
 - success: `{ "imageBase64": "...", "mimeType": "image/png" }`
 
 ---
@@ -84,8 +84,8 @@ Requests from other origins get `403 FORBIDDEN_ORIGIN`.
 
 - The selected model is `@cf/black-forest-labs/flux-2-klein-4b`.
 - Image dimensions are set by `format`: `long` → 1024×576 (16:9), `short` → 576×1024 (9:16).
-- `referenceImageBase64` is accepted by API contract, but reference-image
-  pass-through to the model is not yet implemented.
+- `referenceImageBase64` + `referenceMimeType` are forwarded to the model as
+  `input_image_0` multipart input when provided.
 
 ---
 
@@ -107,4 +107,3 @@ The model did not produce an image. Simplify or rephrase the prompt description.
 Cloudflare Workers have a 30-second CPU wall-clock limit on the free plan.
 If image generation consistently times out, consider upgrading to the Workers
 Paid plan which removes the wall-clock limit.
-
