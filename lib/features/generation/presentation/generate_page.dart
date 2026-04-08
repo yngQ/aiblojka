@@ -20,8 +20,10 @@ import '../providers/generation_provider.dart';
 
 const double _kContentMaxWidth = 600.0;
 const double _kBreakpointWide = 720.0;
+const double _kBreakpointNarrow = 360.0; // very small phones
 const double _kCardRadius = 16.0;
 const double _kCardPadding = 16.0;
+const double _kCardPaddingNarrow = 12.0;
 const double _kSectionSpacing = 16.0;
 const double _kGlowBlurRadius = 20.0;
 const double _kGlowSpreadRadius = 2.0;
@@ -260,15 +262,20 @@ class _AppHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      AppLocalizations.of(context)!.appTitle,
-      textAlign: TextAlign.center,
-      style: const TextStyle(
-        color: AppColors.accent,
-        fontSize: 28,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.2,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < _kBreakpointNarrow;
+        return Text(
+          AppLocalizations.of(context)!.appTitle,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.accent,
+            fontSize: isNarrow ? 22 : 28,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+          ),
+        );
+      },
     );
   }
 }
@@ -335,36 +342,41 @@ class _FormatOption extends StatelessWidget {
         selected ? AppColors.textPrimary : AppColors.textSecondary;
 
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor, width: selected ? 2 : 1),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: titleColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor, width: selected ? 2 : 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: titleColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -443,25 +455,33 @@ class _StyleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.disabled,
-            width: isSelected ? 1.5 : 1,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          // Minimum 44 px touch target height (iOS HIG / Material guideline)
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.disabled,
+              width: isSelected ? 1.5 : 1,
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? AppColors.background : AppColors.textSecondary,
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? AppColors.background : AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
           ),
         ),
       ),
@@ -575,6 +595,7 @@ class _ReferenceImagePicker extends StatelessWidget {
                 foregroundColor: AppColors.textSecondary,
                 side: const BorderSide(color: AppColors.disabled),
                 textStyle: const TextStyle(fontSize: 13),
+                minimumSize: const Size(0, 44),
               ),
             ),
           if (hasError) ...[
@@ -971,14 +992,21 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(_kCardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(_kCardRadius),
-      ),
-      child: child,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final padding = constraints.maxWidth < _kBreakpointNarrow
+            ? _kCardPaddingNarrow
+            : _kCardPadding;
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(padding),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(_kCardRadius),
+          ),
+          child: child,
+        );
+      },
     );
   }
 }
