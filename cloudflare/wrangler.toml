@@ -15,7 +15,7 @@ main = "worker.js"
 # ES Module format — required for the `export default { fetch }` syntax.
 # Cloudflare Workers runtime — no specific compatibility date lock needed
 # for this Worker, but pinning is good practice.
-compatibility_date = "2024-09-23"
+compatibility_date = "2025-01-01"
 
 # ---------------------------------------------------------------------------
 # Workers AI binding
