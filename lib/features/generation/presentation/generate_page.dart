@@ -992,21 +992,15 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final padding = constraints.maxWidth < _kBreakpointNarrow
-            ? _kCardPaddingNarrow
-            : _kCardPadding;
-        return Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(padding),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(_kCardRadius),
-          ),
-          child: child,
-        );
-      },
+    final isNarrow = MediaQuery.sizeOf(context).width < _kBreakpointNarrow;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isNarrow ? _kCardPaddingNarrow : _kCardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(_kCardRadius),
+      ),
+      child: child,
     );
   }
 }
