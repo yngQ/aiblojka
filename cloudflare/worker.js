@@ -101,10 +101,20 @@ export default {
     try {
       input = buildWorkersAiInput(body);
     } catch (err) {
+      if (isInvalidReferenceEncodingError(err)) {
+        return errorResponseWithCors(
+          400,
+          "INVALID_REQUEST",
+          "Invalid reference image encoding.",
+          origin
+        );
+      }
+
+      console.error("Failed to build Workers AI request payload:", normalizeErrorMessage(err));
       return errorResponseWithCors(
-        400,
-        "INVALID_REQUEST",
-        "Invalid reference image encoding.",
+        500,
+        "INTERNAL_ERROR",
+        "Server failed to prepare the AI request.",
         origin
       );
     }
@@ -295,24 +305,23 @@ function buildFullPrompt(body) {
 }
 
 /**
- * Builds the Workers AI model input as a plain object.
+ * Builds the Workers AI model input with the required multipart payload.
  *
- * Workers AI binding expects `env.AI.run(model, plainObject)`.
- * Binary fields (reference image) must be passed as Uint8Array — NOT as FormData.
+ * FLUX.2 Klein models on Workers AI require `multipart` input even for
+ * prompt-only requests.
  *
  * @param {{ prompt: string, format: "long" | "short", referenceImageBase64?: string, referenceMimeType?: string }} body
- * @returns {Record<string, unknown>}
+ * @returns {{ multipart: { body: ReadableStream<Uint8Array>, contentType: string } }}
  * @throws {DOMException} if referenceImageBase64 is not valid base64
+ * @throws {Error} if the multipart payload cannot be serialized
  */
 function buildWorkersAiInput(body) {
   const dimensions = FORMAT_DIMENSIONS[body.format];
+  const form = new FormData();
 
-  /** @type {Record<string, unknown>} */
-  const input = {
-    prompt: buildFullPrompt(body),
-    width: dimensions.width,
-    height: dimensions.height,
-  };
+  form.append("prompt", buildFullPrompt(body));
+  form.append("width", String(dimensions.width));
+  form.append("height", String(dimensions.height));
 
   if (body.referenceImageBase64) {
     // atob throws DOMException for invalid base64 — caught by the caller.
@@ -321,10 +330,36 @@ function buildWorkersAiInput(body) {
     for (let i = 0; i < binaryStr.length; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
-    input.input_image_0 = bytes;
+
+    const mimeType = body.referenceMimeType;
+    const extension =
+      mimeType === "image/jpeg" ? "jpg" :
+      mimeType === "image/png" ? "png" :
+      mimeType === "image/webp" ? "webp" : "bin";
+
+    form.append(
+      "input_image_0",
+      new Blob([bytes], { type: mimeType }),
+      `reference.${extension}`
+    );
   }
 
-  return input;
+  // Create a real multipart body + boundary content type for the binding.
+  // The resulting stream is single-use — it is consumed once by env.AI.run().
+  const multipartResponse = new Response(form);
+  const stream = multipartResponse.body;
+  const contentType = multipartResponse.headers.get("content-type");
+
+  if (!stream || !contentType) {
+    throw new Error("Failed to build multipart payload for Workers AI.");
+  }
+
+  return {
+    multipart: {
+      body: stream,
+      contentType,
+    },
+  };
 }
 
 /**
@@ -335,15 +370,11 @@ function buildWorkersAiInput(body) {
  * @returns {Response}
  */
 function mapWorkersAiError(err, origin) {
-  const message = normalizeErrorMessage(err).toLowerCase();
   const rawMessage = normalizeErrorMessage(err);
+  const { status, code, serviceCode } = extractWorkersAiErrorMetadata(err, rawMessage);
 
-  if (
-    message.includes("quota") ||
-    message.includes("rate limit") ||
-    message.includes("too many requests") ||
-    message.includes("resource exhausted")
-  ) {
+  // Prefer structured fields over text heuristics.
+  if (status === 429 || code === "quota_exceeded" || code === "rate_limit_exceeded") {
     return errorResponseWithCors(
       429,
       "QUOTA_EXCEEDED",
@@ -352,7 +383,13 @@ function mapWorkersAiError(err, origin) {
     );
   }
 
-  if (message.includes("safety") || message.includes("policy")) {
+  // Explicit known codes; broad substring matching avoided to prevent false positives.
+  if (
+    status === 451 ||
+    code === "safety_block" ||
+    code === "content_policy_violation" ||
+    code === "safety_violation"
+  ) {
     return errorResponseWithCors(
       451,
       "SAFETY_BLOCK",
@@ -361,8 +398,52 @@ function mapWorkersAiError(err, origin) {
     );
   }
 
-  if (message.includes("invalid") || message.includes("bad request")) {
+  if (
+    status === 400 ||
+    code === "invalid_request" ||
+    code === "bad_request" ||
+    serviceCode === 5006
+  ) {
     return errorResponseWithCors(400, "BAD_REQUEST", "The request was rejected by the AI model.", origin);
+  }
+
+  // The early returns above already handle all known structured error codes.
+  // hasStructuredMetadata guards the legacy text-heuristic block below:
+  // if any structured field is present, text matching is skipped entirely
+  // to prevent message content from overriding structured status.
+  const hasStructuredMetadata =
+    status !== null || code.length > 0 || serviceCode !== null;
+
+  // Legacy fallback: when upstream does not expose structured error metadata.
+  if (!hasStructuredMetadata) {
+    const message = rawMessage.toLowerCase();
+
+    if (
+      message.includes("quota") ||
+      message.includes("rate limit") ||
+      message.includes("too many requests") ||
+      message.includes("resource exhausted")
+    ) {
+      return errorResponseWithCors(
+        429,
+        "QUOTA_EXCEEDED",
+        "Generation quota reached. Please try again later.",
+        origin
+      );
+    }
+
+    if (message.includes("safety") || message.includes("policy")) {
+      return errorResponseWithCors(
+        451,
+        "SAFETY_BLOCK",
+        "The request was blocked by the content safety filter.",
+        origin
+      );
+    }
+
+    if (message.includes("invalid") || message.includes("bad request")) {
+      return errorResponseWithCors(400, "BAD_REQUEST", "The request was rejected by the AI model.", origin);
+    }
   }
 
   console.error("Workers AI invocation failed:", rawMessage);
@@ -372,6 +453,63 @@ function mapWorkersAiError(err, origin) {
     "The AI service returned an error. Please try again later.",
     origin
   );
+}
+
+/**
+ * Extracts structured metadata from Workers AI error objects.
+ *
+ * @param {unknown} err
+ * @param {string} rawMessage
+ * @returns {{ status: number | null, code: string, serviceCode: number | null }}
+ */
+function extractWorkersAiErrorMetadata(err, rawMessage) {
+  /** @type {number | null} */
+  let status = null;
+  let code = "";
+
+  /** @type {Array<Record<string, unknown>>} */
+  const candidates = [];
+  if (typeof err === "object" && err !== null) {
+    candidates.push(err);
+
+    const direct = /** @type {Record<string, unknown>} */ (err);
+    if (typeof direct.error === "object" && direct.error !== null) {
+      candidates.push(/** @type {Record<string, unknown>} */ (direct.error));
+    }
+    if (typeof direct.response === "object" && direct.response !== null) {
+      candidates.push(/** @type {Record<string, unknown>} */ (direct.response));
+    }
+    if (typeof direct.cause === "object" && direct.cause !== null) {
+      candidates.push(/** @type {Record<string, unknown>} */ (direct.cause));
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (status === null) {
+      const statusValue = candidate.status ?? candidate.statusCode;
+      if (typeof statusValue === "number" && Number.isFinite(statusValue)) {
+        status = statusValue;
+      } else if (typeof statusValue === "string" && /^\d+$/.test(statusValue)) {
+        status = Number.parseInt(statusValue, 10);
+      }
+    }
+
+    if (code.length === 0) {
+      const codeValue = candidate.code ?? candidate.errorCode;
+      if (typeof codeValue === "string" && codeValue.trim().length > 0) {
+        code = codeValue.trim().toLowerCase();
+      }
+    }
+  }
+
+  /** @type {number | null} */
+  let serviceCode = null;
+  const serviceCodeMatch = /^(\d{4,})\s*:/.exec(rawMessage.trim());
+  if (serviceCodeMatch) {
+    serviceCode = Number.parseInt(serviceCodeMatch[1], 10);
+  }
+
+  return { status, code, serviceCode };
 }
 
 /**
@@ -487,4 +625,18 @@ function normalizeErrorMessage(err) {
   } catch {
     return "Unknown error";
   }
+}
+
+/**
+ * Returns true when error indicates an invalid base64 payload in reference image.
+ *
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isInvalidReferenceEncodingError(err) {
+  if (typeof DOMException !== "undefined" && err instanceof DOMException) {
+    return err.name === "InvalidCharacterError";
+  }
+
+  return err instanceof Error && err.name === "InvalidCharacterError";
 }
