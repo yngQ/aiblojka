@@ -84,8 +84,7 @@ export default {
       return errorResponseWithCors(
         500,
         "CONFIGURATION_ERROR",
-        "Server configuration error: Workers AI binding is not set up. " +
-          "Go to Dashboard → Worker → Settings → Bindings, add a Workers AI binding with variable name \"AI\", then redeploy.",
+        "Server configuration error.",
         origin
       );
     }
