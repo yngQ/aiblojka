@@ -7,6 +7,8 @@
  *
  * Required Worker binding:
  *   AI  — Workers AI binding (env.AI.run)
+ *   Configure in Dashboard → Worker → Settings → Bindings → Add Workers AI
+ *   → set variable name to "AI" → Save + Redeploy.
  *
  * Allowed origins:
  *   https://yngq.github.io   — production (GitHub Pages)
@@ -73,8 +75,12 @@ export default {
     }
 
     // Guard: Workers AI binding must be configured.
+    // Fix: Dashboard → Worker → Settings → Bindings → Add Workers AI → variable name "AI".
     if (!env.AI || typeof env.AI.run !== "function") {
-      console.error("Workers AI binding is not configured.");
+      console.error(
+        "Workers AI binding (env.AI) is not configured or missing .run().",
+        "Available env keys:", Object.keys(env).join(", ") || "(none)"
+      );
       return errorResponseWithCors(
         500,
         "CONFIGURATION_ERROR",
@@ -91,9 +97,9 @@ export default {
       return errorResponseWithCors(400, "INVALID_REQUEST", err.message, origin);
     }
 
-    let form;
+    let input;
     try {
-      form = buildWorkersAiInput(body);
+      input = buildWorkersAiInput(body);
     } catch (err) {
       return errorResponseWithCors(
         400,
@@ -105,12 +111,7 @@ export default {
 
     let aiResult;
     try {
-      aiResult = await env.AI.run(WORKERS_AI_MODEL, {
-        multipart: {
-          body: form,
-          contentType: "multipart/form-data",
-        },
-      });
+      aiResult = await env.AI.run(WORKERS_AI_MODEL, input);
     } catch (err) {
       return mapWorkersAiError(err, origin);
     }
@@ -268,49 +269,62 @@ async function parseAndValidateBody(request) {
 // ---------------------------------------------------------------------------
 
 /**
- * Builds Workers AI model input as FormData (required by FLUX.2 Klein).
+ * Builds the full prompt string from the parsed body.
  *
- * @param {{ prompt: string, format: "long" | "short", referenceImageBase64?: string, referenceMimeType?: string }} input
- * @returns {FormData}
- * @throws {DOMException} if referenceImageBase64 is not valid base64
+ * @param {{ prompt: string, format: "long" | "short", referenceImageBase64?: string }} body
+ * @returns {string}
  */
-function buildWorkersAiInput(input) {
+function buildFullPrompt(body) {
   const formatInstruction =
-    input.format === "long"
+    body.format === "long"
       ? "Create a horizontal YouTube thumbnail in 16:9 landscape composition."
       : "Create a vertical short-video cover in 9:16 portrait composition.";
 
-  const referenceClause =
-    input.referenceImageBase64 && input.referenceMimeType
-      ? "Use the provided reference image as a visual style and composition guide. "
-      : "";
+  const referenceClause = body.referenceImageBase64
+    ? "Use the provided reference image as a visual style and composition guide. "
+    : "";
 
-  const fullPrompt =
+  return (
     `You are an expert video thumbnail designer. ` +
     `${formatInstruction} ` +
     `${referenceClause}` +
-    `User concept: ${input.prompt}. ` +
+    `User concept: ${body.prompt}. ` +
     `Style requirements: high contrast, clear focal subject, clean composition, professional quality. ` +
-    `Do not add watermarks, logos, or accidental text unless explicitly requested.`;
+    `Do not add watermarks, logos, or accidental text unless explicitly requested.`
+  );
+}
 
-  const dimensions = FORMAT_DIMENSIONS[input.format];
+/**
+ * Builds the Workers AI model input as a plain object.
+ *
+ * Workers AI binding expects `env.AI.run(model, plainObject)`.
+ * Binary fields (reference image) must be passed as Uint8Array — NOT as FormData.
+ *
+ * @param {{ prompt: string, format: "long" | "short", referenceImageBase64?: string, referenceMimeType?: string }} body
+ * @returns {Record<string, unknown>}
+ * @throws {DOMException} if referenceImageBase64 is not valid base64
+ */
+function buildWorkersAiInput(body) {
+  const dimensions = FORMAT_DIMENSIONS[body.format];
 
-  const form = new FormData();
-  form.append("prompt", fullPrompt);
-  form.append("width", String(dimensions.width));
-  form.append("height", String(dimensions.height));
+  /** @type {Record<string, unknown>} */
+  const input = {
+    prompt: buildFullPrompt(body),
+    width: dimensions.width,
+    height: dimensions.height,
+  };
 
-  if (input.referenceImageBase64 && input.referenceMimeType) {
-    const binaryStr = atob(input.referenceImageBase64);
+  if (body.referenceImageBase64) {
+    // atob throws DOMException for invalid base64 — caught by the caller.
+    const binaryStr = atob(body.referenceImageBase64);
     const bytes = new Uint8Array(binaryStr.length);
     for (let i = 0; i < binaryStr.length; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
-    const blob = new Blob([bytes], { type: input.referenceMimeType });
-    form.append("input_image_0", blob);
+    input.input_image_0 = bytes;
   }
 
-  return form;
+  return input;
 }
 
 /**
