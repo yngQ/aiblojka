@@ -42,6 +42,7 @@ const double _kHistoryThumbRadius = 8.0;
 const double _kAspectLong = 16 / 9;
 const double _kAspectShort = 9 / 16;
 const double _kCloseButtonRadius = 20.0;
+const double _kIconButtonRadius = 22.0;
 
 // ---------------------------------------------------------------------------
 // GeneratePage — root screen
@@ -1082,10 +1083,10 @@ class _AttachButtonState extends State<_AttachButton> {
         duration: const Duration(milliseconds: 150),
         child: Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(_kIconButtonRadius),
           child: InkWell(
             onTap: widget.onAttach,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(_kIconButtonRadius),
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Icon(
@@ -1154,7 +1155,7 @@ class _SendButtonState extends State<_SendButton> {
           height: 44,
           decoration: BoxDecoration(
             color: active ? AppColors.primary : AppColors.disabled,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(_kIconButtonRadius),
             boxShadow: _isHovered && active
                 ? [
                     BoxShadow(
@@ -1167,10 +1168,10 @@ class _SendButtonState extends State<_SendButton> {
           ),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(_kIconButtonRadius),
             child: InkWell(
               onTap: widget.onSend,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(_kIconButtonRadius),
               child: Center(
                 child: widget.isLoading
                     ? const SizedBox(
