@@ -245,7 +245,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     final stateError = generationState.error;
     final isPermanentlyBlocked = stateError is WorkerNotConfiguredException ||
         stateError is GenerationDisabledException;
-    final hasResult = generationState.value != null && !isLoading;
+    final hasResult = generationState.valueOrNull != null && !isLoading;
 
     return Scaffold(
       backgroundColor: AppColors.background,
