@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-
-import 'package:web/web.dart' as web;
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:web/web.dart' as web;
 
 import '../../../core/errors/generation_errors.dart';
 import '../../../core/providers/services_providers.dart';
@@ -19,16 +20,27 @@ import '../providers/generation_provider.dart';
 // ---------------------------------------------------------------------------
 
 const double _kContentMaxWidth = 600.0;
-const double _kBreakpointWide = 720.0;
-const double _kBreakpointNarrow = 360.0; // very small phones
+const double _kBreakpointNarrow = 360.0;
 const double _kCardRadius = 16.0;
 const double _kCardPadding = 16.0;
-const double _kCardPaddingNarrow = 12.0;
-const double _kSectionSpacing = 16.0;
 const double _kGlowBlurRadius = 20.0;
 const double _kGlowSpreadRadius = 2.0;
 const int _kMaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
-const int _kPromptMinLines = 3;
+const double _kPillRadius = 50.0;
+const double _kInputRadius = 28.0;
+const double _kHeroOrbSize = 180.0;
+const double _kResultGlowBlur = 55.0;
+const double _kResultGlowSpread = 8.0;
+const double _kGlowMinOpacity = 0.15;
+const double _kGlowMaxOpacity = 0.55;
+const int _kGlowPulseDurationMs = 1200;
+const double _kBlobSize = 200.0;
+const int _kMorphDurationMs = 2400;
+const int _kRotateDurationMs = 8000;
+const double _kHistoryRowHeight = 100.0;
+const double _kHistoryThumbRadius = 8.0;
+const double _kAspectLong = 16 / 9;
+const double _kAspectShort = 9 / 16;
 
 // ---------------------------------------------------------------------------
 // GeneratePage — root screen
@@ -45,13 +57,20 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   final _promptController = TextEditingController();
 
   GenerationFormat _selectedFormat = GenerationFormat.long;
-  String? _selectedStyle; // null means "no style"
+  String? _selectedStyle;
 
   // Reference image state
   String? _referenceBase64;
   String? _referenceMimeType;
   String? _referenceFileName;
-  bool _referenceError = false;
+
+  // Last generation params for regeneration
+  String _lastPrompt = '';
+  GenerationFormat _lastFormat = GenerationFormat.long;
+  String? _lastStyle;
+  String? _lastReferenceBase64;
+  String? _lastReferenceMimeType;
+  String? _lastReferenceFileName;
 
   @override
   void initState() {
@@ -73,21 +92,28 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   // ---------------------------------------------------------------------------
 
   Future<void> _pickReferenceImage() async {
-    setState(() => _referenceError = false);
-
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
       withData: true,
     );
 
+    if (!mounted) return;
     if (result == null || result.files.isEmpty) return;
 
     final file = result.files.first;
     final bytes = file.bytes;
 
-    if (bytes == null || bytes.length > _kMaxFileSizeBytes) {
-      setState(() => _referenceError = true);
+    if (bytes == null) return;
+
+    if (bytes.length > _kMaxFileSizeBytes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.errorFileSize),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -100,7 +126,13 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     };
 
     if (mime == null) {
-      setState(() => _referenceError = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.errorFileSize),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -108,7 +140,6 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
       _referenceBase64 = base64Encode(bytes);
       _referenceMimeType = mime;
       _referenceFileName = file.name;
-      _referenceError = false;
     });
     unawaited(ref.read(analyticsServiceProvider).logReferenceImageUploaded());
   }
@@ -118,26 +149,42 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
       _referenceBase64 = null;
       _referenceMimeType = null;
       _referenceFileName = null;
-      _referenceError = false;
     });
   }
 
   void _generate() {
     if (_promptController.text.trim().isEmpty) return;
+    // Save for potential regeneration
+    _lastPrompt = _promptController.text.trim();
+    _lastFormat = _selectedFormat;
+    _lastStyle = _selectedStyle;
+    _lastReferenceBase64 = _referenceBase64;
+    _lastReferenceMimeType = _referenceMimeType;
+    _lastReferenceFileName = _referenceFileName;
+
     ref.read(generationNotifierProvider.notifier).generate(
-          prompt: _promptController.text.trim(),
-          format: _selectedFormat,
-          style: _selectedStyle,
-          referenceImageBase64: _referenceBase64,
-          referenceMimeType: _referenceMimeType,
+          prompt: _lastPrompt,
+          format: _lastFormat,
+          style: _lastStyle,
+          referenceImageBase64: _lastReferenceBase64,
+          referenceMimeType: _lastReferenceMimeType,
         );
   }
 
-  void _reset() {
-    ref.read(generationNotifierProvider.notifier).reset();
+  void _regenerate() {
+    if (_lastPrompt.isEmpty) return;
+    _promptController.text = _lastPrompt;
+    setState(() {
+      _selectedFormat = _lastFormat;
+      _selectedStyle = _lastStyle;
+      _referenceBase64 = _lastReferenceBase64;
+      _referenceMimeType = _lastReferenceMimeType;
+      _referenceFileName = _lastReferenceFileName;
+    });
+    _generate();
   }
 
-  void _downloadImage(String imageBase64, String mimeType) {
+  void _downloadImage(String imageBase64, String mimeType, String format) {
     final ext = switch (mimeType) {
       'image/jpeg' => 'jpg',
       'image/webp' => 'webp',
@@ -150,9 +197,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     anchor.click();
 
     unawaited(
-      ref.read(analyticsServiceProvider).logImageDownloaded(
-            format: _selectedFormat.apiString,
-          ),
+      ref.read(analyticsServiceProvider).logImageDownloaded(format: format),
     );
   }
 
@@ -167,88 +212,182 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     final stateError = generationState.error;
     final isPermanentlyBlocked = stateError is WorkerNotConfiguredException ||
         stateError is GenerationDisabledException;
+    final hasResult = generationState.value != null && !isLoading;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= _kBreakpointWide;
-            return Center(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isWide ? 0 : 16,
-                  vertical: 24,
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: _kContentMaxWidth),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _AppHeader(),
-                        const SizedBox(height: 24),
-                        _FormatSelector(
-                          selected: _selectedFormat,
-                          onChanged: isLoading
-                              ? null
-                              : (f) => setState(() => _selectedFormat = f),
-                        ),
-                        const SizedBox(height: _kSectionSpacing),
-                        _StyleSelector(
-                          selected: _selectedStyle,
-                          onChanged: isLoading
-                              ? null
-                              : (s) => setState(() => _selectedStyle = s),
-                        ),
-                        const SizedBox(height: _kSectionSpacing),
-                        _PromptField(
-                          controller: _promptController,
-                          enabled: !isLoading,
-                        ),
-                        const SizedBox(height: _kSectionSpacing),
-                        _ReferenceImagePicker(
-                          fileName: _referenceFileName,
-                          hasError: _referenceError,
-                          enabled: !isLoading,
-                          onPick: _pickReferenceImage,
-                          onClear: _clearReferenceImage,
-                        ),
-                        const SizedBox(height: 24),
-                        _GenerateButton(
-                          isLoading: isLoading,
-                          onPressed: isLoading ||
-                                  isPermanentlyBlocked ||
-                                  _promptController.text.trim().isEmpty
-                              ? null
-                              : _generate,
-                        ),
-                        const SizedBox(height: 24),
-                        if (isLoading) const _GeneratingIndicator(),
-                        generationState.when(
-                          data: (result) {
-                            if (result == null) return const SizedBox.shrink();
-                            return _ResultSection(
-                              result: result,
-                              onDownload: () => _downloadImage(
-                                result.imageBase64,
-                                result.mimeType,
-                              ),
-                              onRegenerate: _reset,
-                            );
-                          },
-                          loading: () => const SizedBox.shrink(),
-                          error: (e, _) => _ErrorCard(error: e),
-                        ),
-                        _HistorySection(onDownload: _downloadImage),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
+            final width = min(constraints.maxWidth, _kContentMaxWidth);
+            return Align(
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: width,
+                height: constraints.maxHeight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    transitionBuilder: (child, animation) =>
+                        FadeTransition(opacity: animation, child: child),
+                    child: hasResult
+                        ? _buildResultView(generationState.value!)
+                        : _buildGenerateView(
+                            isLoading,
+                            stateError,
+                            isPermanentlyBlocked,
+                          ),
+                  ),
                 ),
               ),
             );
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildGenerateView(
+    bool isLoading,
+    Object? error,
+    bool isPermanentlyBlocked,
+  ) {
+    return Column(
+      key: const ValueKey('generate'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Expanded(child: _HeroSection(isLoading: isLoading)),
+        const SizedBox(height: 8),
+        const _AppHeader(),
+        const SizedBox(height: 12),
+        _StyleSelector(
+          selected: _selectedStyle,
+          onChanged:
+              isLoading ? null : (s) => setState(() => _selectedStyle = s),
+        ),
+        const SizedBox(height: 12),
+        _PromptRow(
+          controller: _promptController,
+          isLoading: isLoading,
+          enabled: !isLoading && !isPermanentlyBlocked,
+          onSend: isLoading ||
+                  isPermanentlyBlocked ||
+                  _promptController.text.trim().isEmpty
+              ? null
+              : _generate,
+          referenceAttached: _referenceFileName != null,
+          onAttach: isLoading || isPermanentlyBlocked
+              ? null
+              : _referenceFileName != null
+                  ? _clearReferenceImage
+                  : _pickReferenceImage,
+        ),
+        const SizedBox(height: 8),
+        _FormatToggle(
+          selected: _selectedFormat,
+          onChanged:
+              isLoading ? null : (f) => setState(() => _selectedFormat = f),
+        ),
+        if (error != null) ...[
+          const SizedBox(height: 8),
+          _ErrorCard(error: error),
+        ],
+        _HistoryStrip(onDownload: _downloadImage),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildResultView(GenerationResult result) {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      key: const ValueKey('result'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(_kCardRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.55),
+                  blurRadius: _kResultGlowBlur,
+                  spreadRadius: _kResultGlowSpread,
+                ),
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.25),
+                  blurRadius: _kResultGlowBlur + 25,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(_kCardRadius),
+              child: Image.memory(
+                result.imageBytes,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _downloadImage(
+                  result.imageBase64,
+                  result.mimeType,
+                  _lastFormat.apiString,
+                ),
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: Text(l10n.downloadButton),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 24,
+                  ),
+                  minimumSize: const Size(0, 52),
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _regenerate,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(l10n.regenerateButton),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 24,
+                  ),
+                  minimumSize: const Size(0, 52),
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        _HistoryStrip(onDownload: _downloadImage),
+        const SizedBox(height: 16),
+      ],
     );
   }
 }
@@ -262,11 +401,12 @@ class _AppHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < _kBreakpointNarrow;
-        return Text(
-          AppLocalizations.of(context)!.appTitle,
+    final isNarrow = MediaQuery.sizeOf(context).width < _kBreakpointNarrow;
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        Text(
+          l10n.appTitle,
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.accent,
@@ -274,21 +414,238 @@ class _AppHeader extends StatelessWidget {
             fontWeight: FontWeight.bold,
             letterSpacing: 1.2,
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 6),
+        Text(
+          l10n.appSubtitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// _FormatSelector
+// _HeroSection — loading-aware (orb idle ↔ morphing blob loading)
 // ---------------------------------------------------------------------------
 
-class _FormatSelector extends StatelessWidget {
-  const _FormatSelector({
-    required this.selected,
-    required this.onChanged,
-  });
+class _HeroSection extends StatefulWidget {
+  const _HeroSection({required this.isLoading});
+
+  final bool isLoading;
+
+  @override
+  State<_HeroSection> createState() => _HeroSectionState();
+}
+
+class _HeroSectionState extends State<_HeroSection>
+    with TickerProviderStateMixin {
+  // Idle: breathing orb
+  late final AnimationController _breathController;
+  late final Animation<double> _breathScale;
+
+  // Loading: morphing blob
+  late final AnimationController _morphController;
+  late final AnimationController _rotateController;
+  late final AnimationController _glowController;
+
+  @override
+  void initState() {
+    super.initState();
+    _breathController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _breathScale = Tween<double>(begin: 0.92, end: 1.0).animate(
+      CurvedAnimation(parent: _breathController, curve: Curves.easeInOut),
+    );
+
+    _morphController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _kMorphDurationMs),
+    );
+    _rotateController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _kRotateDurationMs),
+    );
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _kGlowPulseDurationMs),
+    );
+
+    _syncAnimations();
+  }
+
+  @override
+  void didUpdateWidget(_HeroSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isLoading != widget.isLoading) {
+      _syncAnimations();
+    }
+  }
+
+  void _syncAnimations() {
+    if (widget.isLoading) {
+      _breathController.stop();
+      _morphController.repeat(reverse: true);
+      _rotateController.repeat();
+      _glowController.repeat(reverse: true);
+    } else {
+      _morphController.stop();
+      _rotateController.stop();
+      _glowController.stop();
+      _breathController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _breathController.dispose();
+    _morphController.dispose();
+    _rotateController.dispose();
+    _glowController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableSize = constraints.maxHeight;
+        final orbSize = min(_kHeroOrbSize * 1.4, availableSize * 0.65);
+        final blobSize = min(_kBlobSize * 1.2, availableSize * 0.65);
+
+        return Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 350),
+            child: widget.isLoading
+                ? _buildBlob(blobSize, l10n)
+                : _buildOrb(orbSize),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOrb(double size) {
+    return AnimatedBuilder(
+      key: const ValueKey('orb'),
+      animation: _breathScale,
+      builder: (context, child) =>
+          Transform.scale(scale: _breathScale.value, child: child),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              AppColors.accent.withValues(alpha: 0.55),
+              AppColors.primary.withValues(alpha: 0.35),
+              AppColors.background.withValues(alpha: 0.0),
+            ],
+            stops: const [0.0, 0.55, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.4),
+              blurRadius: 60.0,
+              spreadRadius: 10.0,
+            ),
+            BoxShadow(
+              color: AppColors.accent.withValues(alpha: 0.2),
+              blurRadius: 100.0,
+              spreadRadius: 0.0,
+            ),
+          ],
+        ),
+        child: Icon(
+          Icons.auto_awesome,
+          size: size * 0.31,
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBlob(double size, AppLocalizations l10n) {
+    return Column(
+      key: const ValueKey('blob'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedBuilder(
+          animation: Listenable.merge(
+            [_morphController, _rotateController, _glowController],
+          ),
+          builder: (context, _) {
+            final t = _morphController.value;
+            final glow = _kGlowMinOpacity +
+                (_kGlowMaxOpacity - _kGlowMinOpacity) * _glowController.value;
+
+            final r1 = 40.0 + 50.0 * (0.5 + 0.5 * sin(t * pi));
+            final r2 = 40.0 + 50.0 * (0.5 + 0.5 * cos(t * pi + 0.8));
+            final r3 = 40.0 + 50.0 * (0.5 + 0.5 * sin(t * pi + 1.6));
+            final r4 = 40.0 + 50.0 * (0.5 + 0.5 * cos(t * pi + 2.4));
+
+            return Transform.rotate(
+              angle: _rotateController.value * 2 * pi * 0.15,
+              child: Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.8),
+                      AppColors.accent.withValues(alpha: 0.5),
+                      AppColors.background.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(r1 / 100 * size),
+                    topRight: Radius.circular(r2 / 100 * size),
+                    bottomLeft: Radius.circular(r3 / 100 * size),
+                    bottomRight: Radius.circular(r4 / 100 * size),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: glow),
+                      blurRadius: 60.0,
+                      spreadRadius: 20.0,
+                    ),
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: glow * 0.5),
+                      blurRadius: 100.0,
+                      spreadRadius: 5.0,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        Text(
+          l10n.generatingIndicatorLabel,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _FormatToggle + _FormatPill
+// ---------------------------------------------------------------------------
+
+class _FormatToggle extends StatelessWidget {
+  const _FormatToggle({required this.selected, required this.onChanged});
 
   final GenerationFormat selected;
   final ValueChanged<GenerationFormat>? onChanged;
@@ -296,86 +653,99 @@ class _FormatSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return _SectionCard(
-      child: Row(
-        children: [
-          _FormatOption(
-            selected: selected == GenerationFormat.long,
-            title: l10n.formatLong,
-            subtitle: l10n.formatLongSubtitle,
-            onTap: onChanged == null
-                ? null
-                : () => onChanged!(GenerationFormat.long),
-          ),
-          const SizedBox(width: 12),
-          _FormatOption(
-            selected: selected == GenerationFormat.short,
-            title: l10n.formatShort,
-            subtitle: l10n.formatShortSubtitle,
-            onTap: onChanged == null
-                ? null
-                : () => onChanged!(GenerationFormat.short),
-          ),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _FormatPill(
+          label: l10n.formatLong,
+          isSelected: selected == GenerationFormat.long,
+          onTap: onChanged == null
+              ? null
+              : () => onChanged!(GenerationFormat.long),
+        ),
+        const SizedBox(width: 8),
+        _FormatPill(
+          label: l10n.formatShort,
+          isSelected: selected == GenerationFormat.short,
+          onTap: onChanged == null
+              ? null
+              : () => onChanged!(GenerationFormat.short),
+        ),
+      ],
     );
   }
 }
 
-class _FormatOption extends StatelessWidget {
-  const _FormatOption({
-    required this.selected,
-    required this.title,
-    required this.subtitle,
+class _FormatPill extends StatefulWidget {
+  const _FormatPill({
+    required this.label,
+    required this.isSelected,
     required this.onTap,
   });
 
-  final bool selected;
-  final String title;
-  final String subtitle;
+  final String label;
+  final bool isSelected;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final borderColor = selected ? AppColors.primary : AppColors.disabled;
-    final titleColor =
-        selected ? AppColors.textPrimary : AppColors.textSecondary;
+  State<_FormatPill> createState() => _FormatPillState();
+}
 
-    return Expanded(
+class _FormatPillState extends State<_FormatPill> {
+  bool _isHovered = false;
+
+  @override
+  void didUpdateWidget(_FormatPill oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.onTap != null && widget.onTap == null) {
+      setState(() => _isHovered = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(_kPillRadius),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            constraints: const BoxConstraints(minHeight: 56),
-            padding: const EdgeInsets.all(12),
+            duration: const Duration(milliseconds: 150),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             decoration: BoxDecoration(
-              color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor, width: selected ? 2 : 1),
+              color: widget.isSelected
+                  ? AppColors.primary.withValues(alpha: 0.2)
+                  : _isHovered && widget.onTap != null
+                      ? AppColors.primary.withValues(alpha: 0.1)
+                      : Colors.transparent,
+              borderRadius: BorderRadius.circular(_kPillRadius),
+              border: Border.all(
+                color: widget.isSelected
+                    ? AppColors.primary
+                    : _isHovered && widget.onTap != null
+                        ? AppColors.primary.withValues(alpha: 0.5)
+                        : AppColors.disabled,
+                width: widget.isSelected ? 1.5 : 1,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: titleColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                color: widget.isSelected
+                    ? AppColors.primary
+                    : AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: widget.isSelected
+                    ? FontWeight.w600
+                    : FontWeight.w400,
+              ),
             ),
           ),
         ),
@@ -389,10 +759,7 @@ class _FormatOption extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _StyleSelector extends StatelessWidget {
-  const _StyleSelector({
-    required this.selected,
-    required this.onChanged,
-  });
+  const _StyleSelector({required this.selected, required this.onChanged});
 
   final String? selected;
   final ValueChanged<String?>? onChanged;
@@ -409,40 +776,29 @@ class _StyleSelector extends StatelessWidget {
       ('entertainment', l10n.styleEntertainment),
     ];
 
-    return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.styleLabel,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: styles.asMap().entries.map((e) {
+          final index = e.key;
+          final entry = e.value;
+          return Padding(
+            padding: EdgeInsets.only(
+              right: index < styles.length - 1 ? 8.0 : 0.0,
             ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: styles
-                .map(
-                  (entry) => _StyleChip(
-                    label: entry.$2,
-                    isSelected: selected == entry.$1,
-                    onTap: onChanged == null
-                        ? null
-                        : () => onChanged!(entry.$1),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
+            child: _StyleChip(
+              label: entry.$2,
+              isSelected: selected == entry.$1,
+              onTap: onChanged == null ? null : () => onChanged!(entry.$1),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 }
 
-class _StyleChip extends StatelessWidget {
+class _StyleChip extends StatefulWidget {
   const _StyleChip({
     required this.label,
     required this.isSelected,
@@ -454,32 +810,76 @@ class _StyleChip extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<_StyleChip> createState() => _StyleChipState();
+}
+
+class _StyleChipState extends State<_StyleChip> {
+  bool _isHovered = false;
+
+  @override
+  void didUpdateWidget(_StyleChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.onTap != null && widget.onTap == null) {
+      setState(() => _isHovered = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          // Minimum 44 px touch target height (iOS HIG / Material guideline)
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isSelected ? AppColors.primary : AppColors.disabled,
-              width: isSelected ? 1.5 : 1,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? AppColors.background : AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+    return MouseRegion(
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered && widget.onTap != null ? 1.05 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(_kPillRadius),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              constraints: const BoxConstraints(minHeight: 44),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: widget.isSelected
+                    ? AppColors.primary
+                    : AppColors.surface,
+                borderRadius: BorderRadius.circular(_kPillRadius),
+                border: Border.all(
+                  color: widget.isSelected
+                      ? AppColors.primary
+                      : _isHovered && widget.onTap != null
+                          ? AppColors.primary.withValues(alpha: 0.5)
+                          : AppColors.disabled,
+                  width: widget.isSelected ? 1.5 : 1,
+                ),
+                boxShadow: _isHovered && widget.onTap != null && !widget.isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.2),
+                          blurRadius: 12,
+                          spreadRadius: 0,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: widget.isSelected
+                        ? AppColors.background
+                        : AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: widget.isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
               ),
             ),
           ),
@@ -490,124 +890,121 @@ class _StyleChip extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// _PromptField
+// _PromptRow — pill input with attachment icon + embedded send button
 // ---------------------------------------------------------------------------
 
-class _PromptField extends StatelessWidget {
-  const _PromptField({
+class _PromptRow extends StatelessWidget {
+  const _PromptRow({
     required this.controller,
+    required this.isLoading,
     required this.enabled,
+    required this.onSend,
+    required this.referenceAttached,
+    required this.onAttach,
   });
 
   final TextEditingController controller;
+  final bool isLoading;
   final bool enabled;
+  final VoidCallback? onSend;
+  final bool referenceAttached;
+  final VoidCallback? onAttach;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return _SectionCard(
-      child: TextFormField(
-        controller: controller,
-        enabled: enabled,
-        minLines: _kPromptMinLines,
-        maxLines: null,
-        style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
-        decoration: InputDecoration(
-          labelText: l10n.promptLabel,
-          labelStyle: const TextStyle(color: AppColors.textSecondary),
-          hintText: l10n.promptHint,
-          hintStyle: const TextStyle(color: AppColors.disabled, fontSize: 14),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
+    final isEnabled = onSend != null;
+    final isGlowing = isLoading || isEnabled;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(_kInputRadius),
+        border: Border.all(
+          color: isGlowing
+              ? AppColors.primary.withValues(alpha: 0.4)
+              : AppColors.disabled,
+          width: 1.0,
         ),
+        boxShadow: isGlowing
+            ? [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.25),
+                  blurRadius: _kGlowBlurRadius,
+                  spreadRadius: _kGlowSpreadRadius,
+                ),
+              ]
+            : null,
       ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// _ReferenceImagePicker
-// ---------------------------------------------------------------------------
-
-class _ReferenceImagePicker extends StatelessWidget {
-  const _ReferenceImagePicker({
-    required this.fileName,
-    required this.hasError,
-    required this.enabled,
-    required this.onPick,
-    required this.onClear,
-  });
-
-  final String? fileName;
-  final bool hasError;
-  final bool enabled;
-  final VoidCallback onPick;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            l10n.referenceLabel,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (fileName != null)
-            Row(
-              children: [
-                const Icon(Icons.image_outlined,
-                    color: AppColors.accent, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    fileName!,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 13,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+          // Attachment button
+          MouseRegion(
+            cursor: onAttach != null
+                ? SystemMouseCursors.click
+                : SystemMouseCursors.basic,
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(22),
+              child: InkWell(
+                onTap: onAttach,
+                borderRadius: BorderRadius.circular(22),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Icon(
+                    referenceAttached
+                        ? Icons.attachment
+                        : Icons.add_photo_alternate_outlined,
+                    color: referenceAttached
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
+                    size: 22,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close,
-                      color: AppColors.textSecondary, size: 18),
-                  onPressed: enabled ? onClear : null,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            )
-          else
-            OutlinedButton.icon(
-              onPressed: enabled ? onPick : null,
-              icon: const Icon(Icons.upload_outlined, size: 18),
-              label: Text(l10n.referenceButton),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textSecondary,
-                side: const BorderSide(color: AppColors.disabled),
-                textStyle: const TextStyle(fontSize: 13),
-                minimumSize: const Size(0, 44),
               ),
             ),
-          if (hasError) ...[
-            const SizedBox(height: 8),
-            Text(
-              l10n.errorFileSize,
+          ),
+          // Text field
+          Expanded(
+            child: TextField(
+              controller: controller,
+              enabled: enabled,
+              minLines: 1,
+              maxLines: 4,
               style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 12,
+                color: AppColors.textPrimary,
+                fontSize: 15,
+              ),
+              decoration: InputDecoration(
+                hintText: l10n.promptHint,
+                hintStyle: const TextStyle(
+                  color: AppColors.disabled,
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 14,
+                ),
               ),
             ),
-          ],
+          ),
+          // Send button
+          Padding(
+            padding: const EdgeInsets.all(6),
+            child: _SendButton(
+              isLoading: isLoading,
+              isEnabled: isEnabled,
+              onSend: onSend,
+            ),
+          ),
         ],
       ),
     );
@@ -615,209 +1012,91 @@ class _ReferenceImagePicker extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// _GenerateButton
+// _SendButton — circular send / loading indicator with hover
 // ---------------------------------------------------------------------------
 
-class _GenerateButton extends StatelessWidget {
-  const _GenerateButton({
+class _SendButton extends StatefulWidget {
+  const _SendButton({
     required this.isLoading,
-    required this.onPressed,
+    required this.isEnabled,
+    required this.onSend,
   });
 
   final bool isLoading;
-  final VoidCallback? onPressed;
+  final bool isEnabled;
+  final VoidCallback? onSend;
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final isEnabled = onPressed != null;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: isEnabled
-            ? [
-                BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.4),
-                  blurRadius: _kGlowBlurRadius,
-                  spreadRadius: _kGlowSpreadRadius,
-                ),
-              ]
-            : [],
-      ),
-      child: SizedBox(
-        height: 52,
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isEnabled ? AppColors.primary : AppColors.disabled,
-            foregroundColor: isEnabled ? AppColors.background : AppColors.textSecondary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 0,
-          ),
-          child: Text(
-            isLoading ? l10n.generatingLabel : l10n.generateButton,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  State<_SendButton> createState() => _SendButtonState();
 }
 
-// ---------------------------------------------------------------------------
-// _GeneratingIndicator
-// ---------------------------------------------------------------------------
-
-const double _kGlowMinOpacity = 0.15;
-const double _kGlowMaxOpacity = 0.55;
-const int _kGlowPulseDurationMs = 1200;
-const double _kGlowIndicatorBlur = 24.0;
-const double _kGlowIndicatorSpread = 4.0;
-
-class _GeneratingIndicator extends StatefulWidget {
-  const _GeneratingIndicator();
+class _SendButtonState extends State<_SendButton> {
+  bool _isHovered = false;
 
   @override
-  State<_GeneratingIndicator> createState() => _GeneratingIndicatorState();
-}
-
-class _GeneratingIndicatorState extends State<_GeneratingIndicator>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _glowOpacity;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: _kGlowPulseDurationMs),
-    )..repeat(reverse: true);
-
-    _glowOpacity = Tween<double>(
-      begin: _kGlowMinOpacity,
-      end: _kGlowMaxOpacity,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void didUpdateWidget(_SendButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final wasActive = oldWidget.isLoading || oldWidget.isEnabled;
+    final isActive = widget.isLoading || widget.isEnabled;
+    if (wasActive && !isActive) {
+      setState(() => _isHovered = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return AnimatedBuilder(
-      animation: _glowOpacity,
-      builder: (context, child) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
+    final active = widget.isLoading || widget.isEnabled;
+    return MouseRegion(
+      cursor:
+          active ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered && active ? 1.1 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(_kCardRadius),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accent.withValues(alpha: _glowOpacity.value),
-                blurRadius: _kGlowIndicatorBlur,
-                spreadRadius: _kGlowIndicatorSpread,
-              ),
-            ],
+            color: active ? AppColors.primary : AppColors.disabled,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: _isHovered && active
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.45),
+                      blurRadius: 14,
+                      spreadRadius: 0,
+                    ),
+                  ]
+                : null,
           ),
-          child: child,
-        );
-      },
-      child: Center(
-        child: Text(
-          l10n.generatingIndicatorLabel,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 14,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            child: InkWell(
+              onTap: widget.onSend,
+              borderRadius: BorderRadius.circular(22),
+              child: Center(
+                child: widget.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.background,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.arrow_upward,
+                        color: AppColors.background,
+                        size: 20,
+                      ),
+              ),
+            ),
           ),
         ),
       ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// _ResultSection
-// ---------------------------------------------------------------------------
-
-class _ResultSection extends StatelessWidget {
-  const _ResultSection({
-    required this.result,
-    required this.onDownload,
-    required this.onRegenerate,
-  });
-
-  final GenerationResult result;
-  final VoidCallback onDownload;
-  final VoidCallback onRegenerate;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(_kCardRadius),
-          child: Image.memory(
-            result.imageBytes,
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: onDownload,
-                icon: const Icon(Icons.download_outlined, size: 18),
-                label: Text(l10n.downloadButton),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.background,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                  textStyle: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onRegenerate,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: Text(l10n.regenerateButton),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: const TextStyle(fontSize: 15),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -858,10 +1137,7 @@ class _ErrorCard extends StatelessWidget {
           Expanded(
             child: Text(
               _errorMessage(l10n),
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: AppColors.error, fontSize: 14),
             ),
           ),
         ],
@@ -871,19 +1147,14 @@ class _ErrorCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// _HistorySection
+// _HistoryStrip — compact horizontal thumbnail row
 // ---------------------------------------------------------------------------
 
-const double _kHistoryRowHeight = 100.0;
-const double _kHistoryThumbRadius = 8.0;
-// Aspect ratios for cover formats
-const double _kAspectLong = 16 / 9; // → thumb width ≈ 177 at 100 h (capped)
-const double _kAspectShort = 9 / 16; // → thumb width ≈ 56 at 100 h
+class _HistoryStrip extends ConsumerWidget {
+  const _HistoryStrip({required this.onDownload});
 
-class _HistorySection extends ConsumerWidget {
-  const _HistorySection({required this.onDownload});
-
-  final void Function(String imageBase64, String mimeType) onDownload;
+  final void Function(String imageBase64, String mimeType, String format)
+      onDownload;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -894,22 +1165,154 @@ class _HistorySection extends ConsumerWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: _kSectionSpacing),
+        const SizedBox(height: 8),
         Row(
           children: [
             Text(
               l10n.historySectionTitle,
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 13,
+                fontSize: 12,
               ),
             ),
             const Spacer(),
-            GestureDetector(
-              onTap: () =>
+            _ClearHistoryButton(
+              onClear: () =>
                   ref.read(historyNotifierProvider.notifier).clear(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: _kHistoryRowHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: entries.length,
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              final isLong = entry.format == GenerationFormat.long.apiString;
+              final thumbWidth = isLong
+                  ? _kHistoryRowHeight * _kAspectLong
+                  : _kHistoryRowHeight * _kAspectShort;
+
+              final thumb = _HistoryThumb(
+                imageBytes: entry.imageBytes,
+                width: thumbWidth,
+                onTap: () => onDownload(entry.imageBase64, entry.mimeType, entry.format),
+              );
+
+              return Padding(
+                padding: EdgeInsets.only(
+                  right: index < entries.length - 1 ? 8 : 0,
+                ),
+                child: entry.prompt.isEmpty
+                    ? thumb
+                    : Tooltip(
+                        message: entry.prompt,
+                        preferBelow: false,
+                        child: thumb,
+                      ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoryThumb extends StatefulWidget {
+  const _HistoryThumb({
+    required this.imageBytes,
+    required this.width,
+    required this.onTap,
+  });
+
+  final Uint8List imageBytes;
+  final double width;
+  final VoidCallback onTap;
+
+  @override
+  State<_HistoryThumb> createState() => _HistoryThumbState();
+}
+
+class _HistoryThumbState extends State<_HistoryThumb> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered ? 1.04 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
+              child: SizedBox(
+                width: widget.width,
+                height: _kHistoryRowHeight,
+                child: Image.memory(
+                  widget.imageBytes,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: AppColors.surface,
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      color: AppColors.disabled,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClearHistoryButton extends StatefulWidget {
+  const _ClearHistoryButton({required this.onClear});
+
+  final VoidCallback onClear;
+
+  @override
+  State<_ClearHistoryButton> createState() => _ClearHistoryButtonState();
+}
+
+class _ClearHistoryButtonState extends State<_ClearHistoryButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(4),
+        child: InkWell(
+          onTap: widget.onClear,
+          borderRadius: BorderRadius.circular(4),
+          child: AnimatedOpacity(
+            opacity: _isHovered ? 1.0 : 0.6,
+            duration: const Duration(milliseconds: 150),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
                     Icons.delete_outline,
@@ -927,80 +1330,9 @@ class _HistorySection extends ConsumerWidget {
                 ],
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: _kHistoryRowHeight,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: entries.length,
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-              final isLong = entry.format == 'long';
-              final thumbWidth = isLong
-                  ? _kHistoryRowHeight * _kAspectLong
-                  : _kHistoryRowHeight * _kAspectShort;
-              final thumb = GestureDetector(
-                onTap: () => onDownload(entry.imageBase64, entry.mimeType),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
-                  child: SizedBox(
-                    width: thumbWidth,
-                    height: _kHistoryRowHeight,
-                    child: Image.memory(
-                      entry.imageBytes,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        color: AppColors.surface,
-                        child: const Icon(
-                          Icons.broken_image_outlined,
-                          color: AppColors.disabled,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-              return Padding(
-                padding: EdgeInsets.only(right: index < entries.length - 1 ? 8 : 0),
-                child: entry.prompt.isEmpty
-                    ? thumb
-                    : Tooltip(
-                        message: entry.prompt,
-                        preferBelow: false,
-                        child: thumb,
-                      ),
-              );
-            },
           ),
         ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// _SectionCard — shared card container
-// ---------------------------------------------------------------------------
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final isNarrow = MediaQuery.sizeOf(context).width < _kBreakpointNarrow;
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(isNarrow ? _kCardPaddingNarrow : _kCardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(_kCardRadius),
       ),
-      child: child,
     );
   }
 }
