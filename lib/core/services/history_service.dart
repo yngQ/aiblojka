@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:web/web.dart' as web;
 
@@ -29,14 +30,33 @@ class HistoryService {
     }
   }
 
-  /// Prepends [entry] to the stored list and trims to [_kHistoryLimit].
+  /// Prepends [entry] to the stored list, evicting the oldest if at capacity.
+  ///
+  /// If the payload exceeds the localStorage quota, evicts the oldest entries
+  /// one by one until the data fits — preserving as much history as possible.
   void save(HistoryEntry entry) {
-    final entries = loadAll();
-    entries.insert(0, entry);
-    if (entries.length > _kHistoryLimit) {
-      entries.removeRange(_kHistoryLimit, entries.length);
+    var entries = loadAll();
+    if (entries.length >= _kHistoryLimit) {
+      entries.removeLast();
     }
-    _persist(entries);
+    entries.insert(0, entry);
+
+    while (entries.isNotEmpty) {
+      try {
+        _persist(entries);
+        return;
+      } on Object catch (e) {
+        // QuotaExceededError — evict the oldest entry and retry.
+        log(
+          'HistoryService: quota exceeded with ${entries.length} entries, evicting oldest: $e',
+          name: 'HistoryService',
+        );
+        entries = entries.sublist(0, entries.length - 1);
+      }
+    }
+    // Even a single entry did not fit — clear stale data.
+    log('HistoryService: single entry exceeds quota, clearing storage', name: 'HistoryService');
+    web.window.localStorage.removeItem(kHistoryStorageKey);
   }
 
   /// Removes all history entries from localStorage.
@@ -44,13 +64,9 @@ class HistoryService {
     web.window.localStorage.removeItem(kHistoryStorageKey);
   }
 
+  /// Writes [entries] to localStorage. Throws if storage quota is exceeded.
   void _persist(List<HistoryEntry> entries) {
-    try {
-      final json = jsonEncode(entries.map((e) => e.toJson()).toList());
-      web.window.localStorage.setItem(kHistoryStorageKey, json);
-    } catch (_) {
-      // QuotaExceededError or other storage failure — silently skip persistence.
-      // History is still available in memory for the current session.
-    }
+    final json = jsonEncode(entries.map((e) => e.toJson()).toList());
+    web.window.localStorage.setItem(kHistoryStorageKey, json);
   }
 }
