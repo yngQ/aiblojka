@@ -7,6 +7,23 @@ import 'package:web/web.dart' as web;
 import 'package:aiblojka/core/models/history_entry.dart';
 import 'package:aiblojka/core/services/history_service.dart';
 
+/// Simulates a localStorage quota by throwing when the list exceeds
+/// [maxAllowed] entries. Writes through to real storage on success so
+/// that [loadAll] can read back what was actually persisted.
+class _QuotaHistoryService extends HistoryService {
+  _QuotaHistoryService(this.maxAllowed);
+
+  final int maxAllowed;
+
+  @override
+  void persistEntries(List<HistoryEntry> entries) {
+    if (entries.length > maxAllowed) {
+      throw Exception('QuotaExceededError');
+    }
+    super.persistEntries(entries);
+  }
+}
+
 HistoryEntry _entry({
   String imageBase64 = 'aGVsbG8=',
   String mimeType = 'image/png',
@@ -88,6 +105,40 @@ void main() {
       final loaded = service.loadAll();
       expect(loaded, hasLength(1));
       expect(loaded.first.prompt, '');
+    });
+  });
+
+  group('HistoryService quota eviction', () {
+    test('newest entry is preserved when combined payload exceeds quota', () {
+      final quota1 = _QuotaHistoryService(1);
+
+      quota1.save(_entry(prompt: 'old'));
+      quota1.save(_entry(prompt: 'new'));
+
+      final loaded = quota1.loadAll();
+      expect(loaded, hasLength(1));
+      expect(loaded.first.prompt, 'new');
+    });
+
+    test('keeps as many entries as quota allows, newest first', () {
+      final quota2 = _QuotaHistoryService(2);
+
+      quota2.save(_entry(prompt: 'first'));
+      quota2.save(_entry(prompt: 'second'));
+      quota2.save(_entry(prompt: 'third'));
+
+      final loaded = quota2.loadAll();
+      expect(loaded, hasLength(2));
+      expect(loaded[0].prompt, 'third');
+      expect(loaded[1].prompt, 'second');
+    });
+
+    test('clears storage when even a single entry exceeds quota', () {
+      final quota0 = _QuotaHistoryService(0);
+
+      quota0.save(_entry(prompt: 'any'));
+
+      expect(quota0.loadAll(), isEmpty);
     });
   });
 }
