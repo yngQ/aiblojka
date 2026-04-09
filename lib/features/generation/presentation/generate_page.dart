@@ -41,6 +41,7 @@ const double _kHistoryRowHeight = 100.0;
 const double _kHistoryThumbRadius = 8.0;
 const double _kAspectLong = 16 / 9;
 const double _kAspectShort = 9 / 16;
+const double _kCloseButtonRadius = 20.0;
 
 // ---------------------------------------------------------------------------
 // GeneratePage — root screen
@@ -152,6 +153,22 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     });
   }
 
+  void _dispatch({
+    required String prompt,
+    required GenerationFormat format,
+    String? style,
+    String? referenceBase64,
+    String? referenceMimeType,
+  }) {
+    ref.read(generationNotifierProvider.notifier).generate(
+          prompt: prompt,
+          format: format,
+          style: style,
+          referenceImageBase64: referenceBase64,
+          referenceMimeType: referenceMimeType,
+        );
+  }
+
   void _generate() {
     if (_promptController.text.trim().isEmpty) return;
     // Save for potential regeneration
@@ -162,13 +179,13 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     _lastReferenceMimeType = _referenceMimeType;
     _lastReferenceFileName = _referenceFileName;
 
-    ref.read(generationNotifierProvider.notifier).generate(
-          prompt: _lastPrompt,
-          format: _lastFormat,
-          style: _lastStyle,
-          referenceImageBase64: _lastReferenceBase64,
-          referenceMimeType: _lastReferenceMimeType,
-        );
+    _dispatch(
+      prompt: _lastPrompt,
+      format: _lastFormat,
+      style: _lastStyle,
+      referenceBase64: _lastReferenceBase64,
+      referenceMimeType: _lastReferenceMimeType,
+    );
   }
 
   void _regenerate() {
@@ -181,7 +198,13 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
       _referenceMimeType = _lastReferenceMimeType;
       _referenceFileName = _lastReferenceFileName;
     });
-    _generate();
+    _dispatch(
+      prompt: _lastPrompt,
+      format: _lastFormat,
+      style: _lastStyle,
+      referenceBase64: _lastReferenceBase64,
+      referenceMimeType: _lastReferenceMimeType,
+    );
   }
 
   void _downloadImage(String imageBase64, String mimeType, String format) {
@@ -271,7 +294,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
         _PromptRow(
           controller: _promptController,
           isLoading: isLoading,
-          enabled: !isLoading && !isPermanentlyBlocked,
+          isBlocked: isPermanentlyBlocked,
           onSend: isLoading ||
                   isPermanentlyBlocked ||
                   _promptController.text.trim().isEmpty
@@ -308,30 +331,47 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
       children: [
         const SizedBox(height: 16),
         Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(_kCardRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.55),
-                  blurRadius: _kResultGlowBlur,
-                  spreadRadius: _kResultGlowSpread,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 14, right: 14),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(_kCardRadius),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.55),
+                          blurRadius: _kResultGlowBlur,
+                          spreadRadius: _kResultGlowSpread,
+                        ),
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.25),
+                          blurRadius: _kResultGlowBlur + 25,
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(_kCardRadius),
+                      child: Image.memory(
+                        result.imageBytes,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
                 ),
-                BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.25),
-                  blurRadius: _kResultGlowBlur + 25,
-                  spreadRadius: 0,
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_kCardRadius),
-              child: Image.memory(
-                result.imageBytes,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
-            ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: _CloseResultButton(
+                  onTap: () =>
+                      ref.read(generationNotifierProvider.notifier).reset(),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
@@ -897,7 +937,7 @@ class _PromptRow extends StatelessWidget {
   const _PromptRow({
     required this.controller,
     required this.isLoading,
-    required this.enabled,
+    required this.isBlocked,
     required this.onSend,
     required this.referenceAttached,
     required this.onAttach,
@@ -905,7 +945,9 @@ class _PromptRow extends StatelessWidget {
 
   final TextEditingController controller;
   final bool isLoading;
-  final bool enabled;
+  /// True when generation is permanently disabled (kill-switch / worker not configured).
+  /// Combined with [isLoading] to derive text field editability.
+  final bool isBlocked;
   final VoidCallback? onSend;
   final bool referenceAttached;
   final VoidCallback? onAttach;
@@ -970,7 +1012,7 @@ class _PromptRow extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              enabled: enabled,
+              enabled: !isLoading && !isBlocked,
               minLines: 1,
               maxLines: 4,
               style: const TextStyle(
@@ -1141,6 +1183,63 @@ class _ErrorCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _CloseResultButton — X button overlaid on result image top-right corner
+// ---------------------------------------------------------------------------
+
+class _CloseResultButton extends StatefulWidget {
+  const _CloseResultButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_CloseResultButton> createState() => _CloseResultButtonState();
+}
+
+class _CloseResultButtonState extends State<_CloseResultButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered ? 1.1 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(_kCloseButtonRadius),
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(_kCloseButtonRadius),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.background.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(_kCloseButtonRadius),
+                border: Border.all(
+                  color: _isHovered
+                      ? AppColors.primary.withValues(alpha: 0.6)
+                      : AppColors.disabled.withValues(alpha: 0.5),
+                ),
+              ),
+              child: const Icon(
+                Icons.close,
+                size: 18,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
