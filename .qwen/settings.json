@@ -5,7 +5,26 @@
       "args": [
         "mcp-server"
       ]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest"
+      ]
     }
   },
-  "$version": 3
+  "$version": 3,
+  "permissions": {
+    "allow": [
+      "mcp__dart-mcp-server__list_devices",
+      "mcp__dart-mcp-server__launch_app",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__dart-mcp-server__get_app_logs",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__type_text"
+    ]
+  }
 }

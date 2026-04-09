@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "browser-testing-with-devtools": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "computedHash": "27a92aefa21cf769aaf29cce5a99cd2b93c069c5d65c850e1f4af2a1564a299a"
+    },
     "flutter-animating-apps": {
       "source": "flutter/skills",
       "sourceType": "github",
