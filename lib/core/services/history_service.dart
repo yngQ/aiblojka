@@ -8,6 +8,10 @@ import '../models/history_entry.dart';
 /// The localStorage key used to persist generation history.
 /// Exposed so tests can reference the same key without duplicating the string.
 const kHistoryStorageKey = 'aiblojka_history';
+
+/// Maximum number of entries kept by count. In practice the localStorage
+/// quota (~5 MB) is hit before this limit when storing full-size base64
+/// images — quota-based eviction in [HistoryService.save] handles that case.
 const _kHistoryLimit = 10;
 
 /// Persists the last [_kHistoryLimit] generation results in localStorage.
@@ -24,7 +28,7 @@ class HistoryService {
           .cast<Map<String, dynamic>>()
           .map(HistoryEntry.fromJson)
           .toList();
-    } catch (_) {
+    } on Object {
       // Corrupt data — treat as empty rather than crashing.
       return [];
     }
@@ -43,7 +47,7 @@ class HistoryService {
 
     while (entries.isNotEmpty) {
       try {
-        _persist(entries);
+        persistEntries(entries);
         return;
       } on Object catch (e) {
         // QuotaExceededError — evict the oldest entry and retry.
@@ -65,7 +69,10 @@ class HistoryService {
   }
 
   /// Writes [entries] to localStorage. Throws if storage quota is exceeded.
-  void _persist(List<HistoryEntry> entries) {
+  ///
+  /// Extracted as a non-private method so tests can override it to simulate
+  /// [QuotaExceededError] without filling real storage.
+  void persistEntries(List<HistoryEntry> entries) {
     final json = jsonEncode(entries.map((e) => e.toJson()).toList());
     web.window.localStorage.setItem(kHistoryStorageKey, json);
   }
