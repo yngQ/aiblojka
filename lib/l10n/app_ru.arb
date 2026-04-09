@@ -1,6 +1,7 @@
 {
   "@@locale": "ru",
   "appTitle": "AiBlojka",
+  "appSubtitle": "Создай обложку с помощью ИИ",
   "formatLong": "Длинные видео",
   "formatLongSubtitle": "YouTube 1920×1080",
   "formatShort": "Короткие видео",

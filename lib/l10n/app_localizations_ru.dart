@@ -12,6 +12,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appTitle => 'AiBlojka';
 
   @override
+  String get appSubtitle => 'Создай обложку с помощью ИИ';
+
+  @override
   String get formatLong => 'Длинные видео';
 
   @override

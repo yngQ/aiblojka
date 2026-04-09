@@ -100,6 +100,12 @@ abstract class AppLocalizations {
   /// **'AiBlojka'**
   String get appTitle;
 
+  /// No description provided for @appSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Создай обложку с помощью ИИ'**
+  String get appSubtitle;
+
   /// No description provided for @formatLong.
   ///
   /// In ru, this message translates to:
