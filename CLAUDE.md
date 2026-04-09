@@ -106,8 +106,8 @@ You are an expert Flutter and Dart developer. Your goal is to build beautiful, p
 * **Build Methods:** Avoid expensive ops (network) in `build()`.
 
 ## State Management
-* **Native-First:** Prefer `ValueNotifier`, `ChangeNotifier`, `ListenableBuilder`.
-* **Restrictions:** Do NOT use Riverpod, Bloc, or GetX unless explicitly requested.
+* **This project uses Riverpod** (explicitly requested). Use `@riverpod` / `@Riverpod(keepAlive: true)` with code generation for all app state.
+* **Native-First (non-Riverpod projects):** Prefer `ValueNotifier`, `ChangeNotifier`, `ListenableBuilder`.
 * **ChangeNotifier:** For state that is more complex or shared across multiple widgets, use `ChangeNotifier`.
 * **MVVM:** When a more robust solution is needed, structure the app using the Model-View-ViewModel (MVVM) pattern.
 * **Dependency Injection:** Use simple manual constructor dependency injection to make a class's dependencies explicit in its API, and to manage dependencies between different layers of the application.
