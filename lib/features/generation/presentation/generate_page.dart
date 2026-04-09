@@ -105,7 +105,16 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     final file = result.files.first;
     final bytes = file.bytes;
 
-    if (bytes == null) return;
+    if (bytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.errorFileSize),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     if (bytes.length > _kMaxFileSizeBytes) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -983,30 +992,9 @@ class _PromptRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Attachment button
-          MouseRegion(
-            cursor: onAttach != null
-                ? SystemMouseCursors.click
-                : SystemMouseCursors.basic,
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(22),
-              child: InkWell(
-                onTap: onAttach,
-                borderRadius: BorderRadius.circular(22),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Icon(
-                    referenceAttached
-                        ? Icons.attachment
-                        : Icons.add_photo_alternate_outlined,
-                    color: referenceAttached
-                        ? AppColors.accent
-                        : AppColors.textSecondary,
-                    size: 22,
-                  ),
-                ),
-              ),
-            ),
+          _AttachButton(
+            referenceAttached: referenceAttached,
+            onAttach: onAttach,
           ),
           // Text field
           Expanded(
@@ -1048,6 +1036,70 @@ class _PromptRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _AttachButton — attachment icon with hover scale, inside _PromptRow
+// ---------------------------------------------------------------------------
+
+class _AttachButton extends StatefulWidget {
+  const _AttachButton({
+    required this.referenceAttached,
+    required this.onAttach,
+  });
+
+  final bool referenceAttached;
+  final VoidCallback? onAttach;
+
+  @override
+  State<_AttachButton> createState() => _AttachButtonState();
+}
+
+class _AttachButtonState extends State<_AttachButton> {
+  bool _isHovered = false;
+
+  @override
+  void didUpdateWidget(_AttachButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.onAttach != null && widget.onAttach == null) {
+      setState(() => _isHovered = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: widget.onAttach != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered && widget.onAttach != null ? 1.1 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          child: InkWell(
+            onTap: widget.onAttach,
+            borderRadius: BorderRadius.circular(22),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Icon(
+                widget.referenceAttached
+                    ? Icons.attachment
+                    : Icons.add_photo_alternate_outlined,
+                color: widget.referenceAttached
+                    ? AppColors.accent
+                    : AppColors.textSecondary,
+                size: 22,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
