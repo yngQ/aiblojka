@@ -1,0 +1,1 @@
+- [Cloudflare Worker API contract](project_worker_contract.md) — Flutter↔Worker request/response schema, error codes, Workers AI endpoint, allowed origins

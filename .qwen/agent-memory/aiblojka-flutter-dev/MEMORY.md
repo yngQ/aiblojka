@@ -1,0 +1,2 @@
+- [Project Bootstrap](project_bootstrap.md) — key decisions made during initial project setup (l10n config, Firebase stub, test rewrite)
+- [Generated files excluded from git](feedback_generated_files_gitignore.md) — *.g.dart are in .gitignore; never git add them
