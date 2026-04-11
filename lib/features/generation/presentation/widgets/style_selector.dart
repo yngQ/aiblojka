@@ -70,10 +70,10 @@ class StyleChip extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<StyleChip> createState() => StyleChipState();
+  State<StyleChip> createState() => _StyleChipState();
 }
 
-class StyleChipState extends State<StyleChip> {
+class _StyleChipState extends State<StyleChip> {
   bool _isHovered = false;
 
   @override

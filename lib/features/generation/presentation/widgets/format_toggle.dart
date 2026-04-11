@@ -63,10 +63,10 @@ class FormatPill extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<FormatPill> createState() => FormatPillState();
+  State<FormatPill> createState() => _FormatPillState();
 }
 
-class FormatPillState extends State<FormatPill> {
+class _FormatPillState extends State<FormatPill> {
   bool _isHovered = false;
 
   @override

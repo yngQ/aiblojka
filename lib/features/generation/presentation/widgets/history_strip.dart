@@ -11,10 +11,10 @@ import '../../providers/generation_provider.dart';
 // Constants
 // ---------------------------------------------------------------------------
 
-const double kHistoryRowHeight = 100.0;
-const double kHistoryThumbRadius = 8.0;
-const double kAspectLong = 16 / 9;
-const double kAspectShort = 9 / 16;
+const double _kHistoryRowHeight = 100.0;
+const double _kHistoryThumbRadius = 8.0;
+const double _kAspectLong = 16 / 9;
+const double _kAspectShort = 9 / 16;
 
 // ---------------------------------------------------------------------------
 // HistoryStrip — horizontal thumbnail strip
@@ -55,7 +55,7 @@ class HistoryStrip extends ConsumerWidget {
         ),
         const SizedBox(height: 6),
         SizedBox(
-          height: kHistoryRowHeight,
+          height: _kHistoryRowHeight,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: entries.length,
@@ -63,8 +63,8 @@ class HistoryStrip extends ConsumerWidget {
               final entry = entries[index];
               final isLong = entry.format == GenerationFormat.long.apiString;
               final thumbWidth = isLong
-                  ? kHistoryRowHeight * kAspectLong
-                  : kHistoryRowHeight * kAspectShort;
+                  ? _kHistoryRowHeight * _kAspectLong
+                  : _kHistoryRowHeight * _kAspectShort;
 
               final thumb = HistoryThumb(
                 imageBytes: entry.imageBytes,
@@ -110,10 +110,10 @@ class HistoryThumb extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<HistoryThumb> createState() => HistoryThumbState();
+  State<HistoryThumb> createState() => _HistoryThumbState();
 }
 
-class HistoryThumbState extends State<HistoryThumb> {
+class _HistoryThumbState extends State<HistoryThumb> {
   bool _isHovered = false;
 
   @override
@@ -126,15 +126,15 @@ class HistoryThumbState extends State<HistoryThumb> {
         scale: _isHovered ? 1.04 : 1.0,
         duration: const Duration(milliseconds: 150),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(kHistoryThumbRadius),
+          borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: widget.onTap,
-              borderRadius: BorderRadius.circular(kHistoryThumbRadius),
+              borderRadius: BorderRadius.circular(_kHistoryThumbRadius),
               child: SizedBox(
                 width: widget.width,
-                height: kHistoryRowHeight,
+                height: _kHistoryRowHeight,
                 child: Image.memory(
                   widget.imageBytes,
                   fit: BoxFit.cover,
@@ -166,10 +166,10 @@ class ClearHistoryButton extends StatefulWidget {
   final VoidCallback onClear;
 
   @override
-  State<ClearHistoryButton> createState() => ClearHistoryButtonState();
+  State<ClearHistoryButton> createState() => _ClearHistoryButtonState();
 }
 
-class ClearHistoryButtonState extends State<ClearHistoryButton> {
+class _ClearHistoryButtonState extends State<ClearHistoryButton> {
   bool _isHovered = false;
 
   @override

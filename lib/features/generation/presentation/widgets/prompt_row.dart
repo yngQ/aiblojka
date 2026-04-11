@@ -13,6 +13,7 @@ import 'send_button.dart';
 const double _kInputRadius = 28.0;
 const double _kGlowBlurRadius = 20.0;
 const double _kGlowSpreadRadius = 2.0;
+const int _kMaxPromptLength = 2000;
 
 // ---------------------------------------------------------------------------
 // PromptRow — pill input with attachment icon + embedded send button
@@ -39,8 +40,6 @@ class PromptRow extends StatelessWidget {
   final bool referenceAttached;
   final VoidCallback? onAttach;
 
-  static const int maxPromptLength = 2000;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -50,7 +49,7 @@ class PromptRow extends StatelessWidget {
       valueListenable: controller,
       builder: (context, textValue, _) {
         final charCount = textValue.text.length;
-        final isOverLimit = charCount >= maxPromptLength;
+        final isOverLimit = charCount >= _kMaxPromptLength;
         final hasText = textValue.text.trim().isNotEmpty;
         final canSend = onSend != null && hasText && !isOverLimit;
 
@@ -93,7 +92,7 @@ class PromptRow extends StatelessWidget {
                       enabled: isTextFieldEnabled,
                       minLines: 1,
                       maxLines: 4,
-                      maxLength: maxPromptLength,
+                      maxLength: _kMaxPromptLength,
                       maxLengthEnforcement: MaxLengthEnforcement.enforced,
                       style: const TextStyle(
                         color: AppColors.textPrimary,
@@ -136,7 +135,7 @@ class PromptRow extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    '$charCount/$maxPromptLength',
+                    '$charCount/$_kMaxPromptLength',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
