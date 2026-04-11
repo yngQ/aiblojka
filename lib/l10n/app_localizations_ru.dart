@@ -77,6 +77,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get errorServer => 'Ошибка сервера, попробуйте позже';
 
   @override
+  String get errorNoImage =>
+      'ИИ не смог создать изображение, измените описание и попробуйте снова';
+
+  @override
   String get errorNetwork => 'Проверьте подключение к интернету';
 
   @override
