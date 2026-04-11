@@ -31,13 +31,10 @@ abstract final class AppTheme {
     );
   }
 
-  static TextTheme get _textTheme {
-    final base = GoogleFonts.notoSansTextTheme();
-    return base.apply(
-      displayColor: AppColors.textPrimary,
-      bodyColor: AppColors.textPrimary,
-    );
-  }
+  static final TextTheme _textTheme = GoogleFonts.notoSansTextTheme().apply(
+    displayColor: AppColors.textPrimary,
+    bodyColor: AppColors.textPrimary,
+  );
 
   static final ElevatedButtonThemeData _elevatedButtonTheme =
       ElevatedButtonThemeData(

@@ -77,14 +77,10 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   @override
   void initState() {
     super.initState();
-    _promptController.addListener(_onPromptChanged);
   }
-
-  void _onPromptChanged() => setState(() {});
 
   @override
   void dispose() {
-    _promptController.removeListener(_onPromptChanged);
     _promptController.dispose();
     super.dispose();
   }
@@ -308,11 +304,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
           controller: _promptController,
           isLoading: isLoading,
           isBlocked: isPermanentlyBlocked,
-          onSend: isLoading ||
-                  isPermanentlyBlocked ||
-                  _promptController.text.trim().isEmpty
-              ? null
-              : _generate,
+          onSend: isLoading || isPermanentlyBlocked ? null : _generate,
           referenceAttached: _referenceFileName != null,
           onAttach: isLoading || isPermanentlyBlocked
               ? null
@@ -1016,7 +1008,8 @@ class _PromptRow extends StatelessWidget {
       builder: (context, textValue, _) {
         final charCount = textValue.text.length;
         final isOverLimit = charCount >= _kMaxPromptLength;
-        final canSend = onSend != null && !isOverLimit;
+        final hasText = textValue.text.trim().isNotEmpty;
+        final canSend = onSend != null && hasText && !isOverLimit;
 
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
