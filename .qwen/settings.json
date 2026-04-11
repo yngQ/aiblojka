@@ -27,7 +27,10 @@
       "mcp__chrome-devtools__type_text",
       "Bash(fvm *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gh *)",
+      "Bash(git stash *)"
     ]
   }
 }
