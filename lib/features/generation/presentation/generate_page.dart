@@ -62,6 +62,8 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
   String? _lastReferenceMimeType;
   String? _lastReferenceFileName;
 
+  bool _isDownloading = false;
+
   @override
   void initState() {
     super.initState();
@@ -203,21 +205,28 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     );
   }
 
-  void _downloadImage(String imageBase64, String mimeType, String format) {
-    final ext = switch (mimeType) {
-      'image/jpeg' => 'jpg',
-      'image/webp' => 'webp',
-      _ => 'png',
-    };
-    final dataUri = 'data:$mimeType;base64,$imageBase64';
-    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
-    anchor.href = dataUri;
-    anchor.download = 'cover.$ext';
-    anchor.click();
+  Future<void> _downloadImage(String imageBase64, String mimeType, String format) async {
+    setState(() => _isDownloading = true);
+    try {
+      final ext = switch (mimeType) {
+        'image/jpeg' => 'jpg',
+        'image/webp' => 'webp',
+        _ => 'png',
+      };
+      final dataUri = 'data:$mimeType;base64,$imageBase64';
+      final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+      anchor.href = dataUri;
+      anchor.download = 'cover.$ext';
+      anchor.click();
 
-    unawaited(
-      ref.read(analyticsServiceProvider).logImageDownloaded(format: format),
-    );
+      unawaited(
+        ref.read(analyticsServiceProvider).logImageDownloaded(format: format),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -414,14 +423,23 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: isLoading
+                onPressed: isLoading || _isDownloading
                     ? null
                     : () => _downloadImage(
                         result.imageBase64,
                         result.mimeType,
                         _lastFormat.apiString,
                       ),
-                icon: const Icon(Icons.download_outlined, size: 18),
+                icon: _isDownloading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : const Icon(Icons.download_outlined, size: 18),
                 label: Text(l10n.downloadButton),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
