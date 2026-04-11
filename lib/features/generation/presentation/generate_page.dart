@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web/web.dart' as web;
 
@@ -245,7 +245,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     final stateError = generationState.error;
     final isPermanentlyBlocked = stateError is WorkerNotConfiguredException ||
         stateError is GenerationDisabledException;
-    final hasResult = generationState.valueOrNull != null && !isLoading;
+    final hasPreviousResult = generationState.valueOrNull != null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -264,8 +264,11 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
                     duration: const Duration(milliseconds: 400),
                     transitionBuilder: (child, animation) =>
                         FadeTransition(opacity: animation, child: child),
-                    child: hasResult
-                        ? _buildResultView(generationState.value!)
+                    child: hasPreviousResult
+                        ? _buildResultView(
+                            generationState.value!,
+                            isLoading: isLoading,
+                          )
                         : _buildGenerateView(
                             isLoading,
                             stateError,
@@ -333,7 +336,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
     );
   }
 
-  Widget _buildResultView(GenerationResult result) {
+  Widget _buildResultView(GenerationResult result, {required bool isLoading}) {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       key: const ValueKey('result'),
@@ -343,35 +346,72 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
         Expanded(
           child: Stack(
             children: [
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 14, right: 14),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(_kCardRadius),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.55),
-                          blurRadius: _kResultGlowBlur,
-                          spreadRadius: _kResultGlowSpread,
+              // Image with optional loading overlay
+              Stack(
+                children: [
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 14, right: 14),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(_kCardRadius),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.55),
+                              blurRadius: _kResultGlowBlur,
+                              spreadRadius: _kResultGlowSpread,
+                            ),
+                            BoxShadow(
+                              color: AppColors.accent.withValues(alpha: 0.25),
+                              blurRadius: _kResultGlowBlur + 25,
+                              spreadRadius: 0,
+                            ),
+                          ],
                         ),
-                        BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.25),
-                          blurRadius: _kResultGlowBlur + 25,
-                          spreadRadius: 0,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(_kCardRadius),
+                          child: Image.memory(
+                            result.imageBytes,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          ),
                         ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(_kCardRadius),
-                      child: Image.memory(
-                        result.imageBytes,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
                       ),
                     ),
                   ),
-                ),
+                  // Loading overlay during regeneration
+                  if (isLoading) ...[
+                    Positioned.fill(
+                      child: Container(
+                        color: AppColors.background.withValues(alpha: 0.7),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                l10n.generatingIndicatorLabel,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               Positioned(
                 top: 0,
@@ -389,11 +429,13 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _downloadImage(
-                  result.imageBase64,
-                  result.mimeType,
-                  _lastFormat.apiString,
-                ),
+                onPressed: isLoading
+                    ? null
+                    : () => _downloadImage(
+                          result.imageBase64,
+                          result.mimeType,
+                          _lastFormat.apiString,
+                        ),
                 icon: const Icon(Icons.download_outlined, size: 18),
                 label: Text(l10n.downloadButton),
                 style: ElevatedButton.styleFrom(
@@ -412,7 +454,7 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: _regenerate,
+                onPressed: isLoading ? null : _regenerate,
                 icon: const Icon(Icons.refresh, size: 18),
                 label: Text(l10n.regenerateButton),
                 style: OutlinedButton.styleFrom(
@@ -962,82 +1004,114 @@ class _PromptRow extends StatelessWidget {
   final bool referenceAttached;
   final VoidCallback? onAttach;
 
+  static const int _kMaxPromptLength = 2000;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final isEnabled = onSend != null;
-    final isGlowing = isLoading || isEnabled;
+    final isTextFieldEnabled = !isLoading && !isBlocked;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(_kInputRadius),
-        border: Border.all(
-          color: isGlowing
-              ? AppColors.primary.withValues(alpha: 0.4)
-              : AppColors.disabled,
-          width: 1.0,
-        ),
-        boxShadow: isGlowing
-            ? [
-                BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.25),
-                  blurRadius: _kGlowBlurRadius,
-                  spreadRadius: _kGlowSpreadRadius,
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Attachment button
-          _AttachButton(
-            referenceAttached: referenceAttached,
-            onAttach: onAttach,
-          ),
-          // Text field
-          Expanded(
-            child: TextField(
-              controller: controller,
-              enabled: !isLoading && !isBlocked,
-              minLines: 1,
-              maxLines: 4,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-              ),
-              decoration: InputDecoration(
-                hintText: l10n.promptHint,
-                hintStyle: const TextStyle(
-                  color: AppColors.disabled,
-                  fontSize: 14,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                filled: false,
-                fillColor: Colors.transparent,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 14,
-                ),
-              ),
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, textValue, _) {
+        final charCount = textValue.text.length;
+        final isOverLimit = charCount >= _kMaxPromptLength;
+        final canSend = onSend != null && !isOverLimit;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(_kInputRadius),
+            border: Border.all(
+              color: (isLoading || canSend)
+                  ? AppColors.primary.withValues(alpha: 0.4)
+                  : AppColors.disabled,
+              width: 1.0,
             ),
+            boxShadow: (isLoading || canSend)
+                ? [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.25),
+                      blurRadius: _kGlowBlurRadius,
+                      spreadRadius: _kGlowSpreadRadius,
+                    ),
+                  ]
+                : null,
           ),
-          // Send button
-          Padding(
-            padding: const EdgeInsets.all(6),
-            child: _SendButton(
-              isLoading: isLoading,
-              isEnabled: isEnabled,
-              onSend: onSend,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Attachment button
+                  _AttachButton(
+                    referenceAttached: referenceAttached,
+                    onAttach: onAttach,
+                  ),
+                  // Text field
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      enabled: isTextFieldEnabled,
+                      minLines: 1,
+                      maxLines: 4,
+                      maxLength: _kMaxPromptLength,
+                      maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: l10n.promptHint,
+                        hintStyle: const TextStyle(
+                          color: AppColors.disabled,
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 14,
+                        ),
+                        counterText: '',
+                      ),
+                    ),
+                  ),
+                  // Send button
+                  Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: _SendButton(
+                      isLoading: isLoading,
+                      isEnabled: canSend,
+                      onSend: canSend ? onSend : null,
+                    ),
+                  ),
+                ],
+              ),
+              // Character counter
+              Padding(
+                padding: const EdgeInsets.only(right: 12, bottom: 6),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '$charCount/$_kMaxPromptLength',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1209,9 +1283,10 @@ class _ErrorCard extends StatelessWidget {
         QuotaExceededException() => l10n.errorLimitExceeded,
         SafetyBlockException() => l10n.errorSafetyBlock,
         NetworkException() => l10n.errorNetwork,
+        NoImageGeneratedException() => l10n.errorNoImage,
         GenerationDisabledException() => l10n.errorGenerationDisabled,
         WorkerNotConfiguredException() => l10n.errorWorkerNotConfigured,
-        ServerException() || NoImageGeneratedException() => l10n.errorServer,
+        ServerException() => l10n.errorServer,
         _ => l10n.errorServer,
       };
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
@@ -30,23 +31,13 @@ abstract final class AppTheme {
     );
   }
 
-  static const TextTheme _textTheme = TextTheme(
-    displayLarge: TextStyle(color: AppColors.textPrimary),
-    displayMedium: TextStyle(color: AppColors.textPrimary),
-    displaySmall: TextStyle(color: AppColors.textPrimary),
-    headlineLarge: TextStyle(color: AppColors.textPrimary),
-    headlineMedium: TextStyle(color: AppColors.textPrimary),
-    headlineSmall: TextStyle(color: AppColors.textPrimary),
-    titleLarge: TextStyle(color: AppColors.textPrimary),
-    titleMedium: TextStyle(color: AppColors.textPrimary),
-    titleSmall: TextStyle(color: AppColors.textSecondary),
-    bodyLarge: TextStyle(color: AppColors.textPrimary),
-    bodyMedium: TextStyle(color: AppColors.textPrimary),
-    bodySmall: TextStyle(color: AppColors.textSecondary),
-    labelLarge: TextStyle(color: AppColors.textPrimary),
-    labelMedium: TextStyle(color: AppColors.textSecondary),
-    labelSmall: TextStyle(color: AppColors.textSecondary),
-  );
+  static TextTheme get _textTheme {
+    final base = GoogleFonts.notoSansTextTheme();
+    return base.apply(
+      displayColor: AppColors.textPrimary,
+      bodyColor: AppColors.textPrimary,
+    );
+  }
 
   static final ElevatedButtonThemeData _elevatedButtonTheme =
       ElevatedButtonThemeData(

@@ -226,6 +226,12 @@ abstract class AppLocalizations {
   /// **'Ошибка сервера, попробуйте позже'**
   String get errorServer;
 
+  /// No description provided for @errorNoImage.
+  ///
+  /// In ru, this message translates to:
+  /// **'ИИ не смог создать изображение, измените описание и попробуйте снова'**
+  String get errorNoImage;
+
   /// No description provided for @errorNetwork.
   ///
   /// In ru, this message translates to:
