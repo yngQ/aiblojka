@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:js_interop';
 import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
@@ -213,11 +214,19 @@ class _GeneratePageState extends ConsumerState<GeneratePage> {
         'image/webp' => 'webp',
         _ => 'png',
       };
-      final dataUri = 'data:$mimeType;base64,$imageBase64';
+
+      final bytes = base64Decode(imageBase64);
+      final blob = web.Blob(
+        [bytes.toJS].toJS,
+        web.BlobPropertyBag(type: mimeType),
+      );
+      final blobUrl = web.URL.createObjectURL(blob);
+
       final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
-      anchor.href = dataUri;
+      anchor.href = blobUrl;
       anchor.download = 'cover.$ext';
       anchor.click();
+      web.URL.revokeObjectURL(blobUrl);
 
       unawaited(
         ref.read(analyticsServiceProvider).logImageDownloaded(format: format),
